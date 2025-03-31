@@ -939,6 +939,46 @@ const ServerAllocationDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Port Mappings */}
+      {connections.length > 0 && (
+        <div className="mt-4 p-3 bg-gray-100 rounded">
+          <h3 className="text-sm font-semibold mb-2">Port Mappings:</h3>
+          <table className="table-auto w-full text-sm border-collapse border border-gray-300">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="border border-gray-300 px-2 py-1 text-left">From Server</th>
+                <th className="border border-gray-300 px-2 py-1 text-left">To Server</th>
+                <th className="border border-gray-300 px-2 py-1 text-left">Description</th>
+                <th className="border border-gray-300 px-2 py-1 text-left">Ports</th>
+              </tr>
+            </thead>
+            <tbody>
+              {connections.map((conn, idx) => {
+                if (!servers[conn.from] || !servers[conn.to]) return null;
+
+                return conn.services.map((svc, i) => {
+                  const fromService = availableServices.find(s => s.id === svc.from);
+                  const toService = availableServices.find(s => s.id === svc.to);
+
+                  return (
+                    <tr key={`${idx}-${i}`} className="odd:bg-white even:bg-gray-50">
+                      <td className="border border-gray-300 px-2 py-1">{servers[conn.from].ipAddress || servers[conn.from].name}</td>
+                      <td className="border border-gray-300 px-2 py-1">{servers[conn.to].ipAddress || servers[conn.to].name}</td>
+                      <td className="border border-gray-300 px-2 py-1">
+                        {fromService?.name} <ChevronRight className="inline" size={12} /> {toService?.name}
+                      </td>
+                      <td className="border border-gray-300 px-2 py-1">
+                        {toService?.ports?.join(', ') || 'N/A'}
+                      </td>
+                    </tr>
+                  );
+                });
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };
