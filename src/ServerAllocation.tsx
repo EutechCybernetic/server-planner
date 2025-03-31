@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Server, Database, Circle, RefreshCw, ChevronRight, Copy, Upload } from 'lucide-react';
+import { X, Plus, Server, Database, Circle, RefreshCw, ChevronRight, Copy, Upload, AlertCircle } from 'lucide-react';
 
 // Type definitions
 interface Position {
@@ -108,7 +108,7 @@ function checkForErrors(servers:ServerData[]):Array<string> {
     let errors:string[] = [];
     let sqlServers = servers.filter(s=>s.services.includes('sqlserver'));
     if (sqlServers.length>1) {
-        errors.push('Only one SQL Server is supported');
+        errors.push('Only one SQL Server is supported. You have ' + sqlServers.length + ' services.');
     }
     if (sqlServers.length==0) {
         errors.push('One SQL Server is required');
@@ -128,7 +128,7 @@ function checkForErrors(servers:ServerData[]):Array<string> {
         errors.push('You need at least one InfluxDB service');
     }
     if (influxServers.length > 1) {
-        errors.push('Only one InfluxDB is supported');
+        errors.push('Only one InfluxDB is supported. You have ' + influxServers.length + ' services.');
     }
     let lucyServers = servers.filter(s=>s.services.includes('lucy'));
     if (lucyServers.length==0) {
@@ -209,6 +209,8 @@ const ServerAllocationDashboard: React.FC = () => {
   }
   // State for servers
   const [servers, setServers] = useState<ServerData[]>([]);
+  const [errors, setErrors] = useState<string[]>([]); // State to store errors
+  const [showErrorPopup, setShowErrorPopup] = useState<boolean>(false); // State to toggle error popup
   const [showNewServerForm, setShowNewServerForm] = useState<boolean>(false);
   const [newServer, setNewServer] = useState<ServerData>({
     name: '',
@@ -302,6 +304,12 @@ const ServerAllocationDashboard: React.FC = () => {
     
     setConnections(newConnections);
   }, [servers, serviceDependencies]);
+
+  // Validate servers and update errors whenever the server list changes
+  useEffect(() => {
+    const validationErrors = checkForErrors(servers);
+    setErrors(validationErrors);
+  }, [servers]);
 
   // Handler for adding a new server
   const handleAddServer = (): void => {
@@ -568,7 +576,36 @@ const ServerAllocationDashboard: React.FC = () => {
   return (
     <div className="p-4 w-full h-full">
       <h1 className="text-2xl font-bold mb-4">Server Allocation Dashboard</h1>
-      
+
+      {/* Error Icon and Popup */}
+      {errors.length > 0 && (
+        <div className="relative mb-4">
+          <button
+            className="flex items-center px-4 py-2 bg-red-500 text-white rounded"
+            onClick={() => setShowErrorPopup(!showErrorPopup)}
+          >
+            <AlertCircle size={16} className="mr-2" />
+            {errors.length} Error{errors.length > 1 ? 's' : ''}
+          </button>
+          {showErrorPopup && (
+            <div className="absolute top-full mt-2 left-0 bg-white border rounded shadow-lg p-4 z-50">
+              <h3 className="text-lg font-semibold mb-2">Configuration Errors</h3>
+              <ul className="list-disc pl-5 text-sm text-red-600">
+                {errors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+              <button
+                className="mt-2 px-4 py-2 bg-gray-300 rounded"
+                onClick={() => setShowErrorPopup(false)}
+              >
+                Close
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Add buttons for copying and loading configuration */}
       <div className="flex gap-4 mb-4">
         <button 
