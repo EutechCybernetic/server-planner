@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Server, Database, Circle, RefreshCw, ChevronRight } from 'lucide-react';
+import { X, Plus, Server, Database, Circle, RefreshCw, ChevronRight, Copy, Upload } from 'lucide-react';
 
 // Type definitions
 interface Position {
@@ -11,6 +11,7 @@ interface Service {
   id: string;
   name: string;
   icon: React.ReactNode;
+  ports: number[];
 }
 
 interface ServiceDependency {
@@ -86,25 +87,79 @@ interface Connection {
     { from: 'ums', to: 'influxdb' },
     { from: 'ums', to: 'mongodb' },
   ];
+  const availableServices: Service[] = [
+    { id: 'sqlserver', name: 'SQL Server', icon: <Database size={16} />,ports:[1433] },
+    { id: 'redis', name: 'Redis', icon: <Database size={16} /> ,ports:[6379]},
+    { id: 'mongodb', name: 'MongoDB', icon: <Database size={16} />,ports:[27017] },
+    { id: 'influxdb', name: 'InfluxDB', icon: <Database size={16} /> ,ports:[8086]},
+    { id: 'ivivaweb', name: 'ivivaweb', icon: <Circle size={16} /> ,ports:[5000]},
+    { id: 'lucy', name: 'Lucy Engine', icon: <Circle size={16} /> ,ports:[9090,9111]},
+    { id: 'ibmsinterface', name: 'IBMS Interface', icon: <Circle size={16} /> ,ports:[]},
+    { id: 'jobrunner', name: 'Job Runner', icon: <Circle size={16} /> ,ports:[]},
+    { id: 'taskrunner', name: 'Task Runner', icon: <Circle size={16} /> ,ports:[]},
+    { id: 'emailgateway', name: 'Email Gateway', icon: <Circle size={16} /> ,ports:[]},
+    { id: 'smsgateway', name: 'SMS Gateway', icon: <Circle size={16} /> ,ports:[]},
+    { id: 'queryengine', name: 'Data Explorer', icon: <Circle size={16} /> ,ports:[21003]},
+    { id: 'reportengine', name: 'Reporting Service', icon: <Circle size={16} /> ,ports:[21002]},
+    { id: 'sailboat', name: 'Sailboat (MQTT)', icon: <Circle size={16} /> ,ports:[]},
+    { id: 'ums', name: 'UMS', icon: <Circle size={16} /> ,ports:[22314,5122]},
+  ];
+function checkForErrors(servers:ServerData[]):Array<string> {
+    let errors:string[] = [];
+    let sqlServers = servers.filter(s=>s.services.includes('sqlserver'));
+    if (sqlServers.length>1) {
+        errors.push('Only one SQL Server is supported');
+    }
+    if (sqlServers.length==0) {
+        errors.push('One SQL Server is required');
+    }
+
+    let redisServers = servers.filter(s=>s.services.includes('redis'));
+    if (redisServers.length==0) {
+        errors.push('You need at least one Redis service');
+    }
+
+    let mongoServers = servers.filter(s=>s.services.includes('mongodb'));
+    if (mongoServers.length==0) {
+        errors.push('You need at least one MongoDB service');
+    }
+    let influxServers = servers.filter(s=>s.services.includes('influxdb'));
+    if (influxServers.length==0) {
+        errors.push('You need at least one InfluxDB service');
+    }
+    if (influxServers.length > 1) {
+        errors.push('Only one InfluxDB is supported');
+    }
+    let lucyServers = servers.filter(s=>s.services.includes('lucy'));
+    if (lucyServers.length==0) {
+        errors.push('You need at least one Lucy Engine service');
+    }
+    let ivivawebServers = servers.filter(s=>s.services.includes('ivivaweb'));
+    if (ivivawebServers.length==0) {
+        errors.push('You need at least one ivivaweb service');
+    }
+    let jobrunnerServers = servers.filter(s=>s.services.includes('jobrunner'));
+    if (jobrunnerServers.length==0) {
+        errors.push('You need at least one Job Runner service');
+    }
+    let taskrunnerServers = servers.filter(s=>s.services.includes('taskrunner'));
+    if (taskrunnerServers.length==0) {
+        errors.push('You need at least one Task Runner service');
+    }
+    let emailgatewayServers = servers.filter(s=>s.services.includes('emailgateway'));
+    if (emailgatewayServers.length==0) {
+        errors.push('You need at least one Email Gateway service');
+    }
+    let reportengineServers = servers.filter(s=>s.services.includes('reportengine'));
+    if (reportengineServers.length==0) {
+        errors.push('You need at least one Reporting Service');
+    }
+    return errors;
+
+};
 const ServerAllocationDashboard: React.FC = () => {
   // Define available services
-  const availableServices: Service[] = [
-    { id: 'sqlserver', name: 'SQL Server', icon: <Database size={16} /> },
-    { id: 'redis', name: 'Redis', icon: <Database size={16} /> },
-    { id: 'mongodb', name: 'MongoDB', icon: <Database size={16} /> },
-    { id: 'influxdb', name: 'InfluxDB', icon: <Database size={16} /> },
-    { id: 'ivivaweb', name: 'ivivaweb', icon: <Circle size={16} /> },
-    { id: 'lucy', name: 'Lucy Engine', icon: <Circle size={16} /> },
-    { id: 'ibmsinterface', name: 'IBMS Interface', icon: <Circle size={16} /> },
-    { id: 'jobrunner', name: 'Job Runner', icon: <Circle size={16} /> },
-    { id: 'taskrunner', name: 'Task Runner', icon: <Circle size={16} /> },
-    { id: 'emailgateway', name: 'Email Gateway', icon: <Circle size={16} /> },
-    { id: 'smsgateway', name: 'SMS Gateway', icon: <Circle size={16} /> },
-    { id: 'queryengine', name: 'Data Explorer', icon: <Circle size={16} /> },
-    { id: 'reportengine', name: 'Reporting Service', icon: <Circle size={16} /> },
-    { id: 'sailboat', name: 'Sailboat (MQTT)', icon: <Circle size={16} /> },
-    { id: 'ums', name: 'UMS', icon: <Circle size={16} /> },
-  ];
+  
 
 
   function loadPreset(p:string) {
@@ -170,6 +225,31 @@ const ServerAllocationDashboard: React.FC = () => {
   const [dragOffset, setDragOffset] = useState<Position>({ x: 0, y: 0 });
   
   const diagramRef = useRef<HTMLDivElement>(null);
+
+  const handleCopyConfiguration = (): void => {
+    const configuration = {
+      servers,
+      connections,
+    };
+    navigator.clipboard.writeText(JSON.stringify(configuration, null, 2))
+      .then(() => alert('Configuration copied to clipboard!'))
+      .catch(() => alert('Failed to copy configuration.'));
+  };
+
+  const handleLoadConfiguration = (json: string): void => {
+    try {
+      const parsedConfig = JSON.parse(json);
+      if (Array.isArray(parsedConfig.servers) && Array.isArray(parsedConfig.connections)) {
+        setServers(parsedConfig.servers);
+        setConnections(parsedConfig.connections);
+        alert('Configuration loaded successfully!');
+      } else {
+        alert('Invalid configuration format.');
+      }
+    } catch (error) {
+      alert('Failed to parse JSON. Please check the input.');
+    }
+  };
 
   // Calculate server connections based on the services they host
   useEffect(() => {
@@ -488,6 +568,27 @@ const ServerAllocationDashboard: React.FC = () => {
   return (
     <div className="p-4 w-full h-full">
       <h1 className="text-2xl font-bold mb-4">Server Allocation Dashboard</h1>
+      
+      {/* Add buttons for copying and loading configuration */}
+      <div className="flex gap-4 mb-4">
+        <button 
+          className="flex items-center px-4 py-2 bg-green-500 text-white rounded"
+          onClick={handleCopyConfiguration}
+        >
+          <Copy size={16} className="mr-2" />
+          Copy Configuration
+        </button>
+        <button 
+          className="flex items-center px-4 py-2 bg-yellow-500 text-white rounded"
+          onClick={() => {
+            const json = prompt('Paste the JSON configuration here:');
+            if (json) handleLoadConfiguration(json);
+          }}
+        >
+          <Upload size={16} className="mr-2" />
+          Load Configuration
+        </button>
+      </div>
       
       {/* Add Server Button */}
       {(
