@@ -32,7 +32,7 @@ export function downloadFile(filename:string, content:string) {
  * @param dictionary - An object containing values for substitution
  * @returns The template with all placeholders replaced by their corresponding values
  */
-function templatize(template: string, dictionary: Record<string, any>): string {
+export function templatize(template: string, dictionary: Record<string, any>): string {
     // Regular expression to match placeholders like #{ums.ip}
     const placeholderRegex = /#{([^}]+)}/g;
     
@@ -47,13 +47,13 @@ function templatize(template: string, dictionary: Record<string, any>): string {
       for (const part of parts) {
         if (value === undefined || value === null || !(part in value)) {
           // If any part of the path is invalid, return the original placeholder
-          return match;
+          return "";
         }
         value = value[part];
       }
       
       // Convert the value to string for substitution
-      return value !== undefined && value !== null ? String(value) : match;
+      return value !== undefined && value !== null ? String(value) : "";
     });
   }
   

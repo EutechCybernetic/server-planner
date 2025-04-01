@@ -1,4 +1,4 @@
-export default {
+export const ENV:any = {
     iviva: `
 IVIVA_ACCOUNT='#{settings.account}'
 DB_HOST='#{sqlserver.ip}'

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Server, Database, Circle, RefreshCw, ChevronRight, Copy, Upload, AlertCircle } from 'lucide-react';
+import { X, Plus, Server, Database, Circle, RefreshCw, ChevronRight, Copy, Upload, AlertCircle, Route, Zap, Sailboat, ChartArea, Mail, MessageSquare, AlarmClockCheck, Briefcase, Cuboid, Globe, ChartSpline, Telescope } from 'lucide-react';
+import { ENV } from './templates';
+import { downloadFile, templatize } from './util';
 
 // Type definitions
 interface Position {
@@ -19,7 +21,11 @@ interface ServiceDependency {
   from: string;
   to: string;
 }
+interface ConfigFile {
+    name: string;
+    generate:(x:ServerData|LoadBalancer,type:'server'|'lb') => string;
 
+}
 interface ServerData {
   id?: string;
   name: string;
@@ -112,18 +118,18 @@ interface Connection {
     { id: 'sqlserver', name: 'SQL Server', icon: <Database size={16} />,ports:[1433] , supportsHTTPLB: false},
     { id: 'redis', name: 'Redis', icon: <Database size={16} /> ,ports:[6379], supportsHTTPLB: false},
     { id: 'mongodb', name: 'MongoDB', icon: <Database size={16} />,ports:[27017] , supportsHTTPLB: false},
-    { id: 'influxdb', name: 'InfluxDB', icon: <Database size={16} /> ,ports:[8086], supportsHTTPLB: false},
-    { id: 'ivivaweb', name: 'ivivaweb', icon: <Circle size={16} /> ,ports:[5000], supportsHTTPLB: true},
-    { id: 'lucy', name: 'Lucy Engine', icon: <Circle size={16} /> ,ports:[9090,9111], supportsHTTPLB: true},
+    { id: 'influxdb', name: 'InfluxDB', icon: <ChartSpline size={16} /> ,ports:[8086], supportsHTTPLB: false},
+    { id: 'ivivaweb', name: 'ivivaweb', icon: <Globe size={16} /> ,ports:[5000], supportsHTTPLB: true},
+    { id: 'lucy', name: 'Lucy Engine', icon: <Cuboid size={16} /> ,ports:[9090,9111], supportsHTTPLB: true},
     { id: 'ibmsinterface', name: 'IBMS Interface', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
-    { id: 'jobrunner', name: 'Job Runner', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
-    { id: 'taskrunner', name: 'Task Runner', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
-    { id: 'emailgateway', name: 'Email Gateway', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
-    { id: 'smsgateway', name: 'SMS Gateway', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
-    { id: 'queryengine', name: 'Data Explorer', icon: <Circle size={16} /> ,ports:[21003], supportsHTTPLB: true},
-    { id: 'reportengine', name: 'Reporting Service', icon: <Circle size={16} /> ,ports:[21002], supportsHTTPLB: true},
-    { id: 'sailboat', name: 'Sailboat (MQTT)', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
-    { id: 'ums', name: 'UMS', icon: <Circle size={16} /> ,ports:[22314,5122], supportsHTTPLB: true},
+    { id: 'jobrunner', name: 'Job Runner', icon: <Briefcase size={16} /> ,ports:[], supportsHTTPLB: false},
+    { id: 'taskrunner', name: 'Task Runner', icon: <AlarmClockCheck size={16} /> ,ports:[], supportsHTTPLB: false},
+    { id: 'emailgateway', name: 'Email Gateway', icon: <Mail size={16} /> ,ports:[], supportsHTTPLB: false},
+    { id: 'smsgateway', name: 'SMS Gateway', icon: <MessageSquare size={16} /> ,ports:[], supportsHTTPLB: false},
+    { id: 'queryengine', name: 'Data Explorer', icon: <Telescope size={16} /> ,ports:[21003], supportsHTTPLB: true},
+    { id: 'reportengine', name: 'Reporting Service', icon: <ChartArea size={16} /> ,ports:[21002], supportsHTTPLB: true},
+    { id: 'sailboat', name: 'Sailboat (MQTT)', icon: <Sailboat size={16} /> ,ports:[], supportsHTTPLB: false},
+    { id: 'ums', name: 'UMS', icon: <Zap size={16} /> ,ports:[22314,5122], supportsHTTPLB: true},
 
   ];
 function checkForErrors(servers:ServerData[]):Array<string> {
@@ -773,62 +779,35 @@ const ServerAllocationDashboard: React.FC = () => {
     
     return `M ${fromPoint.x} ${fromPoint.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${toPoint.x} ${toPoint.y}`;
   };
-
+  let serviceMap:any = {};
+  for(let s of servers) {
+    for(let srv of s.services) {
+        serviceMap[srv] = {ip:s.ipAddress};
+    }
+  }
+  /* overwrite with load balancer details */
+  for(let s of lbs) {
+    for(let srv of s.services) {
+        serviceMap[srv] = {ip:s.ipAddress};
+    }
+  }
+  function generateEnv(s:ServerData|LoadBalancer) {
+    let services = s.services;
+    let e = '';
+    for(let s of services) {
+        e = ENV['iviva'];
+        e += '\n\n' + (ENV[s]||'');
+    }
+    return templatize(e.trim(),{...serviceMap});
+  }
   return (
     <div className="p-4 w-full h-full">
       <h1 className="text-2xl font-bold mb-4">Server Allocation Dashboard</h1>
 
-      {/* Error Icon and Popup */}
-      {errors.length > 0 && (
-        <div className="relative mb-4">
-          <button
-            className="flex items-center px-4 py-2 bg-red-500 text-white rounded"
-            onClick={() => setShowErrorPopup(!showErrorPopup)}
-          >
-            <AlertCircle size={16} className="mr-2" />
-            {errors.length} Error{errors.length > 1 ? 's' : ''}
-          </button>
-          {showErrorPopup && (
-            <div className="absolute top-full mt-2 left-0 bg-white border rounded shadow-lg p-4 z-50">
-              <h3 className="text-lg font-semibold mb-2">Configuration Errors</h3>
-              <ul className="list-disc pl-5 text-sm text-red-600">
-                {errors.map((error, index) => (
-                  <li key={index}>{error}</li>
-                ))}
-              </ul>
-              <button
-                className="mt-2 px-4 py-2 bg-gray-300 rounded"
-                onClick={() => setShowErrorPopup(false)}
-              >
-                Close
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+     
 
-      {/* Add buttons for copying and loading configuration */}
       <div className="flex gap-4 mb-4">
-        <button 
-          className="flex items-center px-4 py-2 bg-green-500 text-white rounded"
-          onClick={handleCopyConfiguration}
-        >
-          <Copy size={16} className="mr-2" />
-          Copy Configuration
-        </button>
-        <button 
-          className="flex items-center px-4 py-2 bg-yellow-500 text-white rounded"
-          onClick={() => {
-            const json = prompt('Paste the JSON configuration here:');
-            if (json) handleLoadConfiguration(json);
-          }}
-        >
-          <Upload size={16} className="mr-2" />
-          Load Configuration
-        </button>
-      </div>
-      
-      {/* Add Server Button */}
+         {/* Add Server Button */}
       {(
         <button 
           className="flex items-center px-4 py-2 bg-blue-500 text-white rounded mb-4"
@@ -848,6 +827,55 @@ const ServerAllocationDashboard: React.FC = () => {
           Add Load Balancer
         </button>
       )}
+        <button 
+          className="flex items-center px-4 py-2 bg-green-500 text-white mb-4"
+          onClick={handleCopyConfiguration}
+        >
+          <Copy size={16} className="mr-2" />
+          Copy Configuration
+        </button>
+        <button 
+          className="flex items-center px-4 py-2 bg-yellow-500 text-white mb-4"
+          onClick={() => {
+            const json = prompt('Paste the JSON configuration here:');
+            if (json) handleLoadConfiguration(json);
+          }}
+        >
+          <Upload size={16} className="mr-2" />
+          Load Configuration
+        </button>
+         {/* Error Icon and Popup */}
+      {errors.length > 0 && (
+        <div className="relative mb-4">
+          <button
+            className="flex items-center px-4 py-2 bg-red-500 text-white rounded"
+            onClick={() => setShowErrorPopup(!showErrorPopup)}
+          >
+            <AlertCircle size={16} className="mr-2" />
+            {errors.length} Error{errors.length > 1 ? 's' : ''}
+          </button>
+          {showErrorPopup && (
+            <div className="absolute top-full mt-2 left-0 bg-white border rounded shadow-lg p-4 z-50" style={{width:'500px'}}>
+              <h3 className="text-lg font-semibold mb-2">Configuration Errors</h3>
+              <ul className="list-disc pl-5 text-sm text-red-600">
+                {errors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+              <button
+                className="mt-2 px-4 py-2 bg-gray-300 rounded"
+                onClick={() => setShowErrorPopup(false)}
+              >
+                Close
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      </div>
+      
+     
       {/* New LB Form */}
       {showNewLBForm && (
         <div className=" absolute top-0 right-0 left-0 z-50 justify-center items-center  md:inset-20 shadow-xl   max-h-full      bg-gray-100 p-4 rounded mb-4">
@@ -877,7 +905,7 @@ const ServerAllocationDashboard: React.FC = () => {
               <input
                 type="text"
                 className="w-full p-2 border rounded"
-                value={newServer.ipAddress}
+                value={newLB.ipAddress}
                 onChange={(e) => setNewLB({ ...newLB, ipAddress: e.target.value })}
                 placeholder="e.g., 192.168.1.100"
               />
@@ -890,7 +918,7 @@ const ServerAllocationDashboard: React.FC = () => {
               <input
                 type="number"
                 className="w-full p-2 border rounded"
-                value={newServer.cpu}
+                value={newLB.cpu}
                 onChange={(e) => setNewLB({ ...newLB, cpu: parseInt(e.target.value) || 1 })}
                 min="1"
               />
@@ -901,7 +929,7 @@ const ServerAllocationDashboard: React.FC = () => {
               <input
                 type="number"
                 className="w-full p-2 border rounded"
-                value={newServer.ram}
+                value={newLB.ram}
                 onChange={(e) => setNewLB({ ...newLB, ram: parseInt(e.target.value) || 1 })}
                 min="1"
               />
@@ -912,7 +940,7 @@ const ServerAllocationDashboard: React.FC = () => {
               <input
                 type="number"
                 className="w-full p-2 border rounded"
-                value={newServer.disk}
+                value={newLB.disk}
                 onChange={(e) => setNewLB({ ...newLB, disk: parseInt(e.target.value) || 1 })}
                 min="1"
               />
@@ -1119,7 +1147,8 @@ const ServerAllocationDashboard: React.FC = () => {
                 let from = getConnectionTarget(conn,'from');
                 let to = getConnectionTarget(conn,'to');
 
-              if (!servers[conn.from] || !servers[conn.to]) return null;
+            //   if (!servers[conn.from] || !servers[conn.to]) return null;
+            if (!from || !to) return null;
               
               const path = generatePath(from,to);
               
@@ -1242,7 +1271,7 @@ const ServerAllocationDashboard: React.FC = () => {
             >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center">
-                  <Server size={16} className="mr-1" />
+                  <Route size={16} className="mr-1" />
                   <h3 className="font-semibold">{lb.name}</h3>
                 </div>
                 
@@ -1406,6 +1435,48 @@ const ServerAllocationDashboard: React.FC = () => {
           </table>
         </div>
       )}
+      {/* Scripts */}
+      <div className="mt-4 p-3 bg-gray-100 rounded">
+          <h3 className="text-sm font-semibold mb-2">Installation Scripts</h3>
+          <table className="table-auto w-full text-sm border-collapse border border-gray-300">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="border border-gray-300 px-2 py-1 text-left">Server</th>
+                <th className="border border-gray-300 px-2 py-1 text-left">IP Address</th>
+                <th className="border border-gray-300 px-2 py-1 text-left">Scripts</th>
+              </tr>
+            </thead>
+            {(() => {
+              
+
+              return (
+                <tbody>
+                  {([...servers]).map((s:any, idx) => (
+                    <tr key={idx} className="odd:bg-white even:bg-gray-50">
+                      <td className="border border-gray-300 px-2 py-1">{`${s.name}`}</td>
+                      <td className="border border-gray-300 px-2 py-1">{`${s.ipAddress}`}</td>
+                      <td className="border border-gray-300 px-2 py-1">
+                    <a className='border border-gray-300  rounded' onClick={()=>{
+                        let content = generateEnv(s);
+                        downloadFile((s.name||s.ipAddress),content);
+                    }}>.env file</a>
+                      </td>
+                     
+                    </tr>
+                  ))}
+                     {([...lbs]).map((s:any, idx) => (
+                    <tr key={idx} className="odd:bg-white even:bg-gray-50">
+                      <td className="border border-gray-300 px-2 py-1">{`${s.name}`}</td>
+                      <td className="border border-gray-300 px-2 py-1">{` ${s.ipAddress}`}</td>
+                      <td className="border border-gray-300 px-2 py-1">{s.id}</td>
+                     
+                    </tr>
+                  ))}
+                </tbody>
+              );
+            })()}
+          </table>
+        </div>
     </div>
   );
 };
