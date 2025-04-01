@@ -29,6 +29,16 @@ interface ServerData {
   services: string[];
   position: Position;
 }
+interface LoadBalancer {
+    id?: string;
+    name: string;
+    ipAddress: string;
+    cpu: number;
+    ram: number;
+    disk: number;
+    services: string[];
+    position: Position;
+}
 
 interface ConnectionService {
   from: string;
@@ -103,6 +113,7 @@ interface Connection {
     { id: 'reportengine', name: 'Reporting Service', icon: <Circle size={16} /> ,ports:[21002]},
     { id: 'sailboat', name: 'Sailboat (MQTT)', icon: <Circle size={16} /> ,ports:[]},
     { id: 'ums', name: 'UMS', icon: <Circle size={16} /> ,ports:[22314,5122]},
+
   ];
 function checkForErrors(servers:ServerData[]):Array<string> {
     let errors:string[] = [];
@@ -209,8 +220,10 @@ const ServerAllocationDashboard: React.FC = () => {
   }
   // State for servers
   const [servers, setServers] = useState<ServerData[]>([]);
+  const [lbs,setLBs] = useState<LoadBalancer[]>([]);
   const [errors, setErrors] = useState<string[]>([]); // State to store errors
   const [showErrorPopup, setShowErrorPopup] = useState<boolean>(false); // State to toggle error popup
+  const [showNewLBForm, setShowNewLBForm] = useState<boolean>(false);
   const [showNewServerForm, setShowNewServerForm] = useState<boolean>(false);
   const [newServer, setNewServer] = useState<ServerData>({
     name: '',
@@ -221,9 +234,19 @@ const ServerAllocationDashboard: React.FC = () => {
     services: [],
     position: { x: 0, y: 0 }
   });
+  const [newLB, setNewLB] = useState<LoadBalancer>({
+    name: '',
+    ipAddress: '',
+    cpu: 1,
+    ram: 4,
+    disk: 100,
+    services: [],
+    position: { x: 0, y: 0 }
+  });
   const [editingServerIndex, setEditingServerIndex] = useState<number | null>(null);
+  const [editingLBIndex, setEditingLBInex] = useState<number | null>(null);
   const [connections, setConnections] = useState<Connection[]>([]);
-  const [dragging, setDragging] = useState<number | null>(null);
+  const [dragging, setDragging] = useState<{index:number,type:'server'|'lb'} | null>(null);
   const [dragOffset, setDragOffset] = useState<Position>({ x: 0, y: 0 });
   
   const diagramRef = useRef<HTMLDivElement>(null);
@@ -303,7 +326,7 @@ const ServerAllocationDashboard: React.FC = () => {
     });
     
     setConnections(newConnections);
-  }, [servers, serviceDependencies]);
+  }, [servers, lbs, serviceDependencies]);
 
   // Validate servers and update errors whenever the server list changes
   useEffect(() => {
@@ -351,6 +374,46 @@ const ServerAllocationDashboard: React.FC = () => {
     setShowNewServerForm(false);
   };
 
+  const handleAddLB = (): void => {
+    // Set a default position in the diagram area
+    const position: Position = {
+      x: Math.floor(Math.random() * 400),
+      y: Math.floor(Math.random() * 200)
+    };
+    
+    if (editingLBIndex !== null) {
+      // Edit existing server
+      const updatedLBs = [...lbs];
+      const currentPos = updatedLBs[editingLBIndex].position || position;
+      updatedLBs[editingLBIndex] = { 
+        ...newServer, 
+        position: currentPos 
+      };
+      setLBs(updatedLBs);
+      setEditingLBInex(null);
+    } else {
+      // Add new server
+      setLBs([...lbs, { 
+        ...newLB, 
+        id: Date.now().toString(),
+        position
+      }]);
+    }
+    
+    // Reset form
+    setNewLB({
+      name: '',
+      ipAddress: '',
+      cpu: 1,
+      ram: 4,
+      disk: 100,
+      services: [],
+      position: { x: 0, y: 0 }
+    });
+    setShowNewLBForm(false);
+  };
+
+
   // Handler for editing a server
   const handleEditServer = (index: number): void => {
     setNewServer({ ...servers[index] });
@@ -383,8 +446,39 @@ const ServerAllocationDashboard: React.FC = () => {
     }
   };
 
+  const handleEditLB = (index: number): void => {
+    setNewLB({ ...lbs[index] });
+    setEditingLBInex(index);
+    setShowNewServerForm(true);
+  };
+
+  // Handler for removing a server
+  const handleRemoveLB = (index: number): void => {
+    const updatedLBs = [...lbs];
+    updatedLBs.splice(index, 1);
+    setLBs(updatedLBs);
+  };
+
+  // Handler for toggling a service on a server
+  const handleToggleServiceLB = (serviceId: string): void => {
+    const serviceIndex = newLB.services.indexOf(serviceId);
+    if (serviceIndex === -1) {
+      setNewLB({
+        ...newLB,
+        services: [...newLB.services, serviceId]
+      });
+    } else {
+      const updatedServices = [...newLB.services];
+      updatedServices.splice(serviceIndex, 1);
+      setNewLB({
+        ...newLB,
+        services: updatedServices
+      });
+    }
+  };
+
   // Drag start handler
-  const handleDragStart = (event: React.MouseEvent, index: number): void => {
+  const handleDragStart = (event: React.MouseEvent, index: number,type:'server'|'lb'): void => {
     // Prevent default to avoid browser's native drag behavior
     event.preventDefault();
     
@@ -398,7 +492,7 @@ const ServerAllocationDashboard: React.FC = () => {
         y: event.clientY - serverRect.top
       });
       
-      setDragging(index);
+      setDragging({index,type});
       
       // Add an active dragging class
       serverElement.classList.add('dragging');
@@ -953,29 +1047,45 @@ const ServerAllocationDashboard: React.FC = () => {
                 <th className="border border-gray-300 px-2 py-1 text-left">Ports</th>
               </tr>
             </thead>
-            <tbody>
-              {connections.map((conn, idx) => {
-                if (!servers[conn.from] || !servers[conn.to]) return null;
+            {(() => {
+              const groupedConnections = connections.reduce((acc, conn) => {
+                if (!servers[conn.from] || !servers[conn.to]) return acc;
 
-                return conn.services.map((svc, i) => {
-                  const fromService = availableServices.find(s => s.id === svc.from);
-                  const toService = availableServices.find(s => s.id === svc.to);
+                conn.services.forEach((svc) => {
+                  const fromService = availableServices.find((s) => s.id === svc.from);
+                  const toService = availableServices.find((s) => s.id === svc.to);
+                  const key = `${conn.from}-${conn.to}-${toService?.ports?.join(',') || 'N/A'}`;
 
-                  return (
-                    <tr key={`${idx}-${i}`} className="odd:bg-white even:bg-gray-50">
-                      <td className="border border-gray-300 px-2 py-1">{servers[conn.from].ipAddress || servers[conn.from].name}</td>
-                      <td className="border border-gray-300 px-2 py-1">{servers[conn.to].ipAddress || servers[conn.to].name}</td>
-                      <td className="border border-gray-300 px-2 py-1">
-                        {fromService?.name} <ChevronRight className="inline" size={12} /> {toService?.name}
-                      </td>
-                      <td className="border border-gray-300 px-2 py-1">
-                        {toService?.ports?.join(', ') || 'N/A'}
-                      </td>
-                    </tr>
-                  );
+                  if (!acc[key]) {
+                    acc[key] = {
+                      from: servers[conn.from].ipAddress || servers[conn.from].name,
+                      to: servers[conn.to].ipAddress || servers[conn.to].name,
+                      ports: toService?.ports?.join(', ') || 'N/A',
+                      descriptions: [],
+                    };
+                  }
+
+                  acc[key].descriptions.push(`${fromService?.name} → ${toService?.name}`);
                 });
-              })}
-            </tbody>
+
+                return acc;
+              }, {} as any);
+
+              return (
+                <tbody>
+                  {Object.values(groupedConnections).map((group:any, idx) => (
+                    <tr key={idx} className="odd:bg-white even:bg-gray-50">
+                      <td className="border border-gray-300 px-2 py-1">{group.from}</td>
+                      <td className="border border-gray-300 px-2 py-1">{group.to}</td>
+                      <td className="border border-gray-300 px-2 py-1">
+                        {group.descriptions.join('\n')}
+                      </td>
+                      <td className="border border-gray-300 px-2 py-1">{group.ports}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              );
+            })()}
           </table>
         </div>
       )}
