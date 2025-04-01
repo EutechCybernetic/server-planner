@@ -12,6 +12,7 @@ interface Service {
   name: string;
   icon: React.ReactNode;
   ports: number[];
+  supportsHTTPLB: boolean;
 }
 
 interface ServiceDependency {
@@ -47,7 +48,9 @@ interface ConnectionService {
 
 interface Connection {
   from: number;
+  fromType: 'lb'|'server';
   to: number;
+  toType:'lb'|'server';
   services: ConnectionService[];
 }
   // Define service dependencies
@@ -56,11 +59,19 @@ interface Connection {
     { from: 'ivivaweb', to: 'mongodb' },
     { from: 'ivivaweb', to: 'influxdb' },
     { from: 'ivivaweb', to: 'redis' },
+    { from: 'ivivaweb', to: 'queryengine' },
+    { from: 'ivivaweb', to: 'ums' },
+    { from: 'ivivaweb', to: 'reportengine' },
+    { from: 'ivivaweb', to: 'lucy' },
 
     { from: 'lucy', to: 'sqlserver' },
     { from: 'lucy', to: 'mongodb' },
     { from: 'lucy', to: 'influxdb' },
     { from: 'lucy', to: 'redis' },
+    { from: 'lucy', to: 'queryengine' },
+    { from: 'lucy', to: 'ums' },
+    { from: 'lucy', to: 'reportengine' },
+
 
     { from: 'ibmsinterface', to: 'sqlserver' },
     { from: 'ibmsinterface', to: 'ivivaweb' },
@@ -98,21 +109,21 @@ interface Connection {
     { from: 'ums', to: 'mongodb' },
   ];
   const availableServices: Service[] = [
-    { id: 'sqlserver', name: 'SQL Server', icon: <Database size={16} />,ports:[1433] },
-    { id: 'redis', name: 'Redis', icon: <Database size={16} /> ,ports:[6379]},
-    { id: 'mongodb', name: 'MongoDB', icon: <Database size={16} />,ports:[27017] },
-    { id: 'influxdb', name: 'InfluxDB', icon: <Database size={16} /> ,ports:[8086]},
-    { id: 'ivivaweb', name: 'ivivaweb', icon: <Circle size={16} /> ,ports:[5000]},
-    { id: 'lucy', name: 'Lucy Engine', icon: <Circle size={16} /> ,ports:[9090,9111]},
-    { id: 'ibmsinterface', name: 'IBMS Interface', icon: <Circle size={16} /> ,ports:[]},
-    { id: 'jobrunner', name: 'Job Runner', icon: <Circle size={16} /> ,ports:[]},
-    { id: 'taskrunner', name: 'Task Runner', icon: <Circle size={16} /> ,ports:[]},
-    { id: 'emailgateway', name: 'Email Gateway', icon: <Circle size={16} /> ,ports:[]},
-    { id: 'smsgateway', name: 'SMS Gateway', icon: <Circle size={16} /> ,ports:[]},
-    { id: 'queryengine', name: 'Data Explorer', icon: <Circle size={16} /> ,ports:[21003]},
-    { id: 'reportengine', name: 'Reporting Service', icon: <Circle size={16} /> ,ports:[21002]},
-    { id: 'sailboat', name: 'Sailboat (MQTT)', icon: <Circle size={16} /> ,ports:[]},
-    { id: 'ums', name: 'UMS', icon: <Circle size={16} /> ,ports:[22314,5122]},
+    { id: 'sqlserver', name: 'SQL Server', icon: <Database size={16} />,ports:[1433] , supportsHTTPLB: false},
+    { id: 'redis', name: 'Redis', icon: <Database size={16} /> ,ports:[6379], supportsHTTPLB: false},
+    { id: 'mongodb', name: 'MongoDB', icon: <Database size={16} />,ports:[27017] , supportsHTTPLB: false},
+    { id: 'influxdb', name: 'InfluxDB', icon: <Database size={16} /> ,ports:[8086], supportsHTTPLB: false},
+    { id: 'ivivaweb', name: 'ivivaweb', icon: <Circle size={16} /> ,ports:[5000], supportsHTTPLB: true},
+    { id: 'lucy', name: 'Lucy Engine', icon: <Circle size={16} /> ,ports:[9090,9111], supportsHTTPLB: true},
+    { id: 'ibmsinterface', name: 'IBMS Interface', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
+    { id: 'jobrunner', name: 'Job Runner', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
+    { id: 'taskrunner', name: 'Task Runner', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
+    { id: 'emailgateway', name: 'Email Gateway', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
+    { id: 'smsgateway', name: 'SMS Gateway', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
+    { id: 'queryengine', name: 'Data Explorer', icon: <Circle size={16} /> ,ports:[21003], supportsHTTPLB: true},
+    { id: 'reportengine', name: 'Reporting Service', icon: <Circle size={16} /> ,ports:[21002], supportsHTTPLB: true},
+    { id: 'sailboat', name: 'Sailboat (MQTT)', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
+    { id: 'ums', name: 'UMS', icon: <Circle size={16} /> ,ports:[22314,5122], supportsHTTPLB: true},
 
   ];
 function checkForErrors(servers:ServerData[]):Array<string> {
@@ -255,6 +266,7 @@ const ServerAllocationDashboard: React.FC = () => {
     const configuration = {
       servers,
       connections,
+      lbs,
     };
     navigator.clipboard.writeText(JSON.stringify(configuration, null, 2))
       .then(() => alert('Configuration copied to clipboard!'))
@@ -264,10 +276,10 @@ const ServerAllocationDashboard: React.FC = () => {
   const handleLoadConfiguration = (json: string): void => {
     try {
       const parsedConfig = JSON.parse(json);
-      if (Array.isArray(parsedConfig.servers) && Array.isArray(parsedConfig.connections)) {
+      if (Array.isArray(parsedConfig.servers) && Array.isArray(parsedConfig.connections) && Array.isArray(parsedConfig.lbs)) {
         setServers(parsedConfig.servers);
+        setLBs(parsedConfig.lbs);
         setConnections(parsedConfig.connections);
-        alert('Configuration loaded successfully!');
       } else {
         alert('Invalid configuration format.');
       }
@@ -279,50 +291,123 @@ const ServerAllocationDashboard: React.FC = () => {
   // Calculate server connections based on the services they host
   useEffect(() => {
     const newConnections: Connection[] = [];
-    const serverServices: Record<string, number> = {};
-    
+    const serverServices: Record<string, number[]> = {};
+    const lbMap: Record<string,number> = {};
+    lbs.forEach((lb,lbi)=>{
+        for(let service of lb.services) {
+            lbMap[service] = lbi;
+        }
+    });
+
+    //first create connections from load balancers to servers
+    let si = 0;
+    for(let server of servers) {
+        for(let service of server.services) {
+            if (lbMap[service] != undefined) {
+                let ec = newConnections.find( conn => 
+                    conn.from == lbMap[service] &&
+                    conn.fromType == 'lb' &&
+                    conn.to == si && 
+                    conn.toType == 'server'
+                );
+                if (!ec) {
+                    ec = {
+                        from:lbMap[service],
+                        fromType:'lb',
+                        to:si,
+                        toType:'server',
+                        services:[],
+                    };
+                    newConnections.push(ec);
+                }
+            }
+        }
+        si++;
+    }
+
     // Map services to their servers
     servers.forEach((server, serverIndex) => {
       server.services.forEach(serviceId => {
-        serverServices[serviceId] = serverIndex;
+        if (!serverServices[serviceId]) serverServices[serviceId] = [];
+        serverServices[serviceId].push(serverIndex);
       });
     });
     
     // Create connections based on service dependencies
     serviceDependencies.forEach(dep => {
-      const fromServerIndex = serverServices[dep.from];
-      const toServerIndex = serverServices[dep.to];
-      
-      if (fromServerIndex !== undefined && 
-          toServerIndex !== undefined && 
-          fromServerIndex !== toServerIndex) {
-        // Check if this connection already exists
-        const connectionExists = newConnections.some(
-          conn => conn.from === fromServerIndex && conn.to === toServerIndex
-        );
-        
-        if (!connectionExists) {
-          newConnections.push({
-            from: fromServerIndex,
-            to: toServerIndex,
-            services: [{
-              from: dep.from,
-              to: dep.to
-            }]
-          });
+      const fromServerIndices = serverServices[dep.from]||[];
+      const toServerIndices = serverServices[dep.to]||[];
+      const lbIndex = lbMap[dep.to];
+      if (fromServerIndices.length != 0 &&  toServerIndices.length != 0 ) {
+        // this is hooked via a load balancer
+        if (lbIndex != undefined) {
+            for (let fromServerIndex of fromServerIndices) {
+                let ec = newConnections.find(
+                    conn => conn.from === fromServerIndex && conn.to === lbIndex &&
+                        conn.fromType == 'server' && conn.toType == 'lb'
+                );
+                if (!ec) {
+                    ec = {
+                        from: fromServerIndex,
+                        to: lbIndex,
+                        fromType: 'server',
+                        toType: 'lb',
+                        services: [],
+                    };
+                    newConnections.push(ec);
+                }
+                ec.services.push({ from: dep.from, to: dep.to });
+                //find corresponding lb connection
+                let lec = newConnections.find(conn => conn.fromType === 'lb' && conn.from === lbIndex && conn.toType == 'server' && conn.to == fromServerIndex);
+                if (lec) {
+
+                    let lecService = lec?.services?.find(x => x.from == dep.from && x.to == dep.to);
+                    if (!lecService) {
+                        lec.services.push({from:dep.from,to:dep.to});
+                    }
+                }
+
+            }
         } else {
-          // Add the service dependency to the existing connection
-          const existingConn = newConnections.find(
-            conn => conn.from === fromServerIndex && conn.to === toServerIndex
-          );
-          if (existingConn) {
-            existingConn.services.push({
-              from: dep.from,
-              to: dep.to
-            });
-          }
+            for (let fromServerIndex of fromServerIndices) {
+
+                for (let toServerIndex of toServerIndices) {
+                    //direct connection
+                    if (fromServerIndex != toServerIndex) {
+                        const connectionExists = newConnections.some(
+                            conn => conn.from === fromServerIndex && conn.to === toServerIndex &&
+                                conn.fromType == 'server' && conn.toType == 'server'
+                        );
+
+                        if (!connectionExists) {
+                            newConnections.push({
+                                from: fromServerIndex,
+                                to: toServerIndex,
+                                fromType: 'server',
+                                toType: 'server',
+                                services: [{
+                                    from: dep.from,
+                                    to: dep.to
+                                }]
+                            });
+                        } else {
+                            // Add the service dependency to the existing connection
+                            const existingConn = newConnections.find(
+                                conn => conn.from === fromServerIndex && conn.to === toServerIndex
+                            );
+                            if (existingConn) {
+                                existingConn.services.push({
+                                    from: dep.from,
+                                    to: dep.to
+                                });
+                            }
+                        }
+                    }
+                }
+            }
         }
       }
+    
     });
     
     setConnections(newConnections);
@@ -333,6 +418,22 @@ const ServerAllocationDashboard: React.FC = () => {
     const validationErrors = checkForErrors(servers);
     setErrors(validationErrors);
   }, [servers]);
+
+  function getConnectionTarget(c:Connection,type:'from'|'to'):ServerData|LoadBalancer {
+    if (type == 'from') {
+        if (c.fromType == 'lb') {
+            return lbs[c.from];
+        } else {
+            return servers[c.from];
+        }
+    } else {
+        if (c.toType == 'lb') {
+            return lbs[c.to];
+        } else {
+            return servers[c.to];
+        }
+    }
+  }
 
   // Handler for adding a new server
   const handleAddServer = (): void => {
@@ -386,7 +487,7 @@ const ServerAllocationDashboard: React.FC = () => {
       const updatedLBs = [...lbs];
       const currentPos = updatedLBs[editingLBIndex].position || position;
       updatedLBs[editingLBIndex] = { 
-        ...newServer, 
+        ...newLB, 
         position: currentPos 
       };
       setLBs(updatedLBs);
@@ -449,7 +550,7 @@ const ServerAllocationDashboard: React.FC = () => {
   const handleEditLB = (index: number): void => {
     setNewLB({ ...lbs[index] });
     setEditingLBInex(index);
-    setShowNewServerForm(true);
+    setShowNewLBForm(true);
   };
 
   // Handler for removing a server
@@ -517,27 +618,33 @@ const ServerAllocationDashboard: React.FC = () => {
       x = Math.max(0, Math.min(x, rect.width - serverWidth));
       y = Math.max(0, Math.min(y, rect.height - serverHeight));
       
+      let {index,type} = dragging;
+      const updated:LoadBalancer[]|ServerData[] = [...(type == 'lb' ? lbs : servers)];
       // Update server position with rounding for smoother movement
-      const updatedServers = [...servers];
-      updatedServers[dragging] = {
-        ...updatedServers[dragging],
+    //   const updatedServers = [...servers];
+      updated[index] = {
+        ...updated[index],
         position: { 
           x: Math.round(x), 
           y: Math.round(y) 
         }
       };
-      
-      setServers(updatedServers);
+      if (type == 'lb') {
+        setLBs(updated);
+      } else {
+        setServers(updated);
+      }
     }
   };
 
   // Drag end handler
   const handleDragEnd = (): void => {
     if (dragging !== null) {
+        let {index,type} = dragging;
       // Remove the active dragging class from the element
       const serverElements = document.querySelectorAll('.server-block');
-      if (serverElements[dragging]) {
-        serverElements[dragging].classList.remove('dragging');
+      if (serverElements[index]) {
+        serverElements[index].classList.remove('dragging');
       }
       setDragging(null);
     }
@@ -581,7 +688,7 @@ const ServerAllocationDashboard: React.FC = () => {
   }
 
   // Function to generate SVG path between servers
-  const generatePath = (fromServer: ServerData, toServer: ServerData): string => {
+  const generatePath = (fromServer: ServerData|LoadBalancer, toServer: ServerData|LoadBalancer): string => {
     const serverWidth = 300;
     const serverHeight = 200;
     
@@ -731,7 +838,127 @@ const ServerAllocationDashboard: React.FC = () => {
           Add Server
         </button>
       )}
-      
+       {/* Add LB Button */}
+       {(
+        <button 
+          className="flex items-center px-4 py-2 bg-blue-500 text-white rounded mb-4"
+          onClick={() => setShowNewLBForm(true)}
+        >
+          <Plus size={16} className="mr-2" />
+          Add Load Balancer
+        </button>
+      )}
+      {/* New LB Form */}
+      {showNewLBForm && (
+        <div className=" absolute top-0 right-0 left-0 z-50 justify-center items-center  md:inset-20 shadow-xl   max-h-full      bg-gray-100 p-4 rounded mb-4">
+            <div className="flex items-center mb-2">
+          <h2 className="text-lg font-semibold mr-4">
+            {editingLBIndex !== null ? 'Edit Load Balancer' : 'New Load Balancer'}
+          </h2>
+          <div className="flex-grow">
+         
+        </div>
+        </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block mb-1">LB Name</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded"
+                value={newLB.name}
+                onChange={(e) => setNewLB({ ...newLB, name: e.target.value })}
+                placeholder="e.g., Production DB Server"
+              />
+            </div>
+            
+            <div>
+              <label className="block mb-1">IP Address</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded"
+                value={newServer.ipAddress}
+                onChange={(e) => setNewLB({ ...newLB, ipAddress: e.target.value })}
+                placeholder="e.g., 192.168.1.100"
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className="block mb-1">CPU (cores)</label>
+              <input
+                type="number"
+                className="w-full p-2 border rounded"
+                value={newServer.cpu}
+                onChange={(e) => setNewLB({ ...newLB, cpu: parseInt(e.target.value) || 1 })}
+                min="1"
+              />
+            </div>
+            
+            <div>
+              <label className="block mb-1">RAM (GB)</label>
+              <input
+                type="number"
+                className="w-full p-2 border rounded"
+                value={newServer.ram}
+                onChange={(e) => setNewLB({ ...newLB, ram: parseInt(e.target.value) || 1 })}
+                min="1"
+              />
+            </div>
+            
+            <div>
+              <label className="block mb-1">Disk (GB)</label>
+              <input
+                type="number"
+                className="w-full p-2 border rounded"
+                value={newServer.disk}
+                onChange={(e) => setNewLB({ ...newLB, disk: parseInt(e.target.value) || 1 })}
+                min="1"
+              />
+            </div>
+          </div>
+          
+          <div className="mb-4">
+            <label className="block mb-1">Services to Load Balance</label>
+            <div className="flex flex-wrap gap-2">
+              {availableServices.filter((service)=>service.supportsHTTPLB).map((service) => (
+                <button
+                  key={service.id}
+                  className={`flex items-center px-3 py-1 rounded border ${
+                    newLB.services.includes(service.id)
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white'
+                  }`}
+                  onClick={() => handleToggleServiceLB(service.id)}
+                >
+                  {service.icon}
+                  <span className="ml-1">{service.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              className="px-4 py-2 bg-blue-500 text-white rounded"
+              onClick={handleAddLB}
+            >
+              {editingLBIndex !== null ? 'Update LB' : 'Add LB'}
+            </button>
+            
+            <button
+              className="px-4 py-2 bg-gray-300 rounded"
+              onClick={() => {
+                setShowNewLBForm(false);
+                setEditingLBInex(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       {/* New Server Form */}
       {showNewServerForm && (
         <div className=" absolute top-0 right-0 left-0 z-50 justify-center items-center  md:inset-20 shadow-xl   max-h-full      bg-gray-100 p-4 rounded mb-4">
@@ -746,12 +973,13 @@ const ServerAllocationDashboard: React.FC = () => {
         value="custom"
       >
         <option value="custom">Select Preset</option>
-        <option value="web">Web Server</option>
+        <option value="webonly">Web Server</option>
+        <option value="web">Web Server (ivivaweb+Lucy)</option>
         <option value="ibms-app">App Server (For IBMS)</option>
         <option value="app">App Server</option>
         <option value="worker">Worker</option>
         <option value="sqlserver">Sql Server</option>
-        <option value="db">Databases</option>
+        <option value="db">Other Databases</option>
         <option value="ums">UMS</option>
       </select>
         </div>
@@ -888,9 +1116,12 @@ const ServerAllocationDashboard: React.FC = () => {
             </defs>
             
             {connections.map((conn, idx) => {
+                let from = getConnectionTarget(conn,'from');
+                let to = getConnectionTarget(conn,'to');
+
               if (!servers[conn.from] || !servers[conn.to]) return null;
               
-              const path = generatePath(servers[conn.from], servers[conn.to]);
+              const path = generatePath(from,to);
               
               return (
                 <g key={`conn-${idx}`}>
@@ -923,16 +1154,16 @@ const ServerAllocationDashboard: React.FC = () => {
             <div
               key={server.id || idx}
               className={`server-block absolute border rounded p-3 bg-white shadow cursor-move ${
-                dragging === idx ? 'opacity-80 z-10 shadow-lg' : 'z-2'
+                (dragging?.index === idx && dragging?.type=='server') ? 'opacity-80 z-10 shadow-lg' : 'z-2'
               }`}
               style={{
                 width: '300px',
                 left: `${server.position.x}px`,
                 top: `${server.position.y}px`,
-                transition: dragging === idx ? 'none' : 'all 0.15s ease-out',
-                transform: dragging === idx ? 'scale(1.02)' : 'scale(1)'
+                transition: (dragging?.index === idx && dragging?.type=='server') ? 'none' : 'all 0.15s ease-out',
+                transform: (dragging?.index === idx && dragging?.type=='server') ? 'scale(1.02)' : 'scale(1)'
               }}
-              onMouseDown={(e) => handleDragStart(e, idx)}
+              onMouseDown={(e) => handleDragStart(e, idx,'server')}
             >
               <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center">
@@ -994,8 +1225,83 @@ const ServerAllocationDashboard: React.FC = () => {
               </div>
             </div>
           ))}
+          {lbs.map((lb, idx) => (
+            <div
+              key={lb.id || idx}
+              className={`server-block lb-block absolute border rounded p-3 bg-white shadow cursor-move ${
+                (dragging?.index === idx && dragging?.type=='lb') ? 'opacity-80 z-10 shadow-lg' : 'z-2'
+              }`}
+              style={{
+                width: '300px',
+                left: `${lb.position.x}px`,
+                top: `${lb.position.y}px`,
+                transition: (dragging?.index === idx && dragging?.type=='lb') ? 'none' : 'all 0.15s ease-out',
+                transform: (dragging?.index === idx && dragging?.type=='lb') ? 'scale(1.02)' : 'scale(1)'
+              }}
+              onMouseDown={(e) => handleDragStart(e, idx,'lb')}
+            >
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex items-center">
+                  <Server size={16} className="mr-1" />
+                  <h3 className="font-semibold">{lb.name}</h3>
+                </div>
+                
+                <div className="flex gap-1">
+                  <button
+                    className="text-gray-500 hover:text-gray-700"
+                    onClick={() => handleEditLB(idx)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="text-red-500 hover:text-red-700"
+                    onClick={() => handleRemoveLB(idx)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="text-xs text-gray-500 mb-2">
+                {lb.ipAddress}
+              </div>
+              
+              <div className="grid grid-cols-3 gap-1 text-xs mb-3">
+                <div className="bg-gray-100 p-1 rounded text-center">
+                  CPU: {lb.cpu} cores
+                </div>
+                <div className="bg-gray-100 p-1 rounded text-center">
+                  RAM: {lb.ram} GB
+                </div>
+                <div className="bg-gray-100 p-1 rounded text-center">
+                  Disk: {lb.disk} GB
+                </div>
+              </div>
+              
+              <div className="border-t pt-2">
+                <div className="text-xs font-semibold mb-1">Services:</div>
+                <div className="flex flex-wrap gap-1">
+                  {lb.services.map(serviceId => {
+                    const service = availableServices.find(s => s.id === serviceId);
+                    return service ? (
+                      <div
+                        key={serviceId}
+                        className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded flex items-center"
+                      >
+                        {service.icon}
+                        <span className="ml-1">{service.name}</span>
+                      </div>
+                    ) : null;
+                  })}
+                  {lb.services.length === 0 && (
+                    <div className="text-xs text-gray-500">No services assigned</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
           
-          {servers.length === 0 && !showNewServerForm && (
+          {servers.length === 0 && !showNewServerForm && lbs.length==0 && !showNewLBForm && (
             <div className="text-center py-12 text-gray-500">
               No servers configured. Click "Add Server" to get started.
             </div>
@@ -1009,12 +1315,14 @@ const ServerAllocationDashboard: React.FC = () => {
           <h3 className="text-sm font-semibold mb-2">Server Dependencies:</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
             {connections.map((conn, idx) => {
-              if (!servers[conn.from] || !servers[conn.to]) return null;
+                let from = getConnectionTarget(conn,'from');
+                let to = getConnectionTarget(conn,'to');
+              if (!from || !to) return null;
               
               return (
                 <div key={idx} className="text-sm border-b pb-2">
                   <div className="font-medium">
-                    {servers[conn.from].name} <ChevronRight className="inline" size={14} /> {servers[conn.to].name}
+                    {from.name} <ChevronRight className="inline" size={14} /> {to.name}
                   </div>
                   <div className="text-xs text-gray-600 pl-4">
                     {conn.services.map((svc, i) => {
@@ -1049,27 +1357,36 @@ const ServerAllocationDashboard: React.FC = () => {
             </thead>
             {(() => {
               const groupedConnections = connections.reduce((acc, conn) => {
-                if (!servers[conn.from] || !servers[conn.to]) return acc;
-
+                const from = getConnectionTarget(conn,'from');
+                const to = getConnectionTarget(conn,'to');
+                if (!from || !to) return acc;
+                if (conn.fromType == 'lb') {
+                    console.log('XXXX',from,to,conn.services);
+                }
                 conn.services.forEach((svc) => {
+
                   const fromService = availableServices.find((s) => s.id === svc.from);
                   const toService = availableServices.find((s) => s.id === svc.to);
-                  const key = `${conn.from}-${conn.to}-${toService?.ports?.join(',') || 'N/A'}`;
-
+                  const key = `${conn.fromType}${conn.from}-${conn.toType}${conn.to}-${toService?.ports?.join(',') || 'N/A'}`;
+                    console.log('YYYY',key);
                   if (!acc[key]) {
                     acc[key] = {
-                      from: servers[conn.from].ipAddress || servers[conn.from].name,
-                      to: servers[conn.to].ipAddress || servers[conn.to].name,
+                      from: from.ipAddress || from.name,
+                      to:to.ipAddress ||to.name,
                       ports: toService?.ports?.join(', ') || 'N/A',
                       descriptions: [],
                     };
                   }
 
                   acc[key].descriptions.push(`${fromService?.name} → ${toService?.name}`);
+
                 });
 
                 return acc;
               }, {} as any);
+              for(let lb of lbs) {
+
+              }
 
               return (
                 <tbody>
