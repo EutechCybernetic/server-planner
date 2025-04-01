@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Server, Database, Circle, RefreshCw, ChevronRight, Copy, Upload, AlertCircle, Route, Zap, Sailboat, ChartArea, Mail, MessageSquare, AlarmClockCheck, Briefcase, Cuboid, Globe, ChartSpline, Telescope } from 'lucide-react';
-import { ENV } from './templates';
+import { ENV, START_SCRIPT, YAML } from './templates';
 import { downloadFile, templatize } from './util';
 
 // Type definitions
@@ -15,6 +15,7 @@ interface Service {
   icon: React.ReactNode;
   ports: number[];
   supportsHTTPLB: boolean;
+  dockerProfile:string|string[];
 }
 
 interface ServiceDependency {
@@ -115,21 +116,21 @@ interface Connection {
     { from: 'ums', to: 'mongodb' },
   ];
   const availableServices: Service[] = [
-    { id: 'sqlserver', name: 'SQL Server', icon: <Database size={16} />,ports:[1433] , supportsHTTPLB: false},
-    { id: 'redis', name: 'Redis', icon: <Database size={16} /> ,ports:[6379], supportsHTTPLB: false},
-    { id: 'mongodb', name: 'MongoDB', icon: <Database size={16} />,ports:[27017] , supportsHTTPLB: false},
-    { id: 'influxdb', name: 'InfluxDB', icon: <ChartSpline size={16} /> ,ports:[8086], supportsHTTPLB: false},
-    { id: 'ivivaweb', name: 'ivivaweb', icon: <Globe size={16} /> ,ports:[5000], supportsHTTPLB: true},
-    { id: 'lucy', name: 'Lucy Engine', icon: <Cuboid size={16} /> ,ports:[9090,9111], supportsHTTPLB: true},
-    { id: 'ibmsinterface', name: 'IBMS Interface', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false},
-    { id: 'jobrunner', name: 'Job Runner', icon: <Briefcase size={16} /> ,ports:[], supportsHTTPLB: false},
-    { id: 'taskrunner', name: 'Task Runner', icon: <AlarmClockCheck size={16} /> ,ports:[], supportsHTTPLB: false},
-    { id: 'emailgateway', name: 'Email Gateway', icon: <Mail size={16} /> ,ports:[], supportsHTTPLB: false},
-    { id: 'smsgateway', name: 'SMS Gateway', icon: <MessageSquare size={16} /> ,ports:[], supportsHTTPLB: false},
-    { id: 'queryengine', name: 'Data Explorer', icon: <Telescope size={16} /> ,ports:[21003], supportsHTTPLB: true},
-    { id: 'reportengine', name: 'Reporting Service', icon: <ChartArea size={16} /> ,ports:[21002], supportsHTTPLB: true},
-    { id: 'sailboat', name: 'Sailboat (MQTT)', icon: <Sailboat size={16} /> ,ports:[], supportsHTTPLB: false},
-    { id: 'ums', name: 'UMS', icon: <Zap size={16} /> ,ports:[22314,5122], supportsHTTPLB: true},
+    { id: 'sqlserver', name: 'SQL Server', icon: <Database size={16} />,ports:[1433] , supportsHTTPLB: false, dockerProfile:'mssql'},
+    { id: 'redis', name: 'Redis', icon: <Database size={16} /> ,ports:[6379], supportsHTTPLB: false, dockerProfile:'redis'},
+    { id: 'mongodb', name: 'MongoDB', icon: <Database size={16} />,ports:[27017] , supportsHTTPLB: false, dockerProfile:'mongo'},
+    { id: 'influxdb', name: 'InfluxDB', icon: <ChartSpline size={16} /> ,ports:[8086], supportsHTTPLB: false, dockerProfile:'influx'},
+    { id: 'ivivaweb', name: 'ivivaweb', icon: <Globe size={16} /> ,ports:[5000], supportsHTTPLB: true, dockerProfile:'ivivaweb'},
+    { id: 'lucy', name: 'Lucy Engine', icon: <Cuboid size={16} /> ,ports:[9090,9111], supportsHTTPLB: true, dockerProfile:'lucyengine'},
+    { id: 'ibmsinterface', name: 'IBMS Interface', icon: <Circle size={16} /> ,ports:[], supportsHTTPLB: false, dockerProfile:'ibmsinterfacecore'},
+    { id: 'jobrunner', name: 'Job Runner', icon: <Briefcase size={16} /> ,ports:[], supportsHTTPLB: false, dockerProfile:'jobrunner'},
+    { id: 'taskrunner', name: 'Task Runner', icon: <AlarmClockCheck size={16} /> ,ports:[], supportsHTTPLB: false, dockerProfile:'sdtaskrunner'},
+    { id: 'emailgateway', name: 'Email Gateway', icon: <Mail size={16} /> ,ports:[], supportsHTTPLB: false, dockerProfile:'emailgateway'},
+    { id: 'smsgateway', name: 'SMS Gateway', icon: <MessageSquare size={16} /> ,ports:[], supportsHTTPLB: false, dockerProfile:''},
+    { id: 'queryengine', name: 'Data Explorer', icon: <Telescope size={16} /> ,ports:[21003], supportsHTTPLB: true, dockerProfile:'queryengine'},
+    { id: 'reportengine', name: 'Reporting Service', icon: <ChartArea size={16} /> ,ports:[21002], supportsHTTPLB: true, dockerProfile:'boldreports'},
+    { id: 'sailboat', name: 'Sailboat (MQTT)', icon: <Sailboat size={16} /> ,ports:[], supportsHTTPLB: false, dockerProfile:''},
+    { id: 'ums', name: 'UMS', icon: <Zap size={16} /> ,ports:[22314,5122], supportsHTTPLB: true, dockerProfile:['ums','umsapp']},
 
   ];
 function checkForErrors(servers:ServerData[]):Array<string> {
@@ -800,6 +801,30 @@ const ServerAllocationDashboard: React.FC = () => {
     }
     return templatize(e.trim(),{...serviceMap});
   }
+  function generateIvivaConfig(s:ServerData|LoadBalancer) {
+    return templatize(YAML.trim(),{...serviceMap});
+  }
+  function generateDockerCompose(s:ServerData|LoadBalancer) {
+    return templatize(YAML.trim(),{...serviceMap});
+  }
+  function generateStartScript(s:ServerData|LoadBalancer) {
+    let profiles = '';
+    for(let srv of s.services) {
+      let a = availableServices.find((x)=>x.id==srv);
+      if (a) {
+        let pr:string[] = [];
+        if (Array.isArray(a.dockerProfile)) {
+          pr = a.dockerProfile;
+        } else {
+          pr = [a.dockerProfile];
+        }
+
+        profiles += pr.map((x)=>` --profile ${x} `).join(' ');
+
+      }
+    }
+    return templatize(START_SCRIPT.trim(),{...serviceMap,server:s,docker:{profiles}});
+  }
   return (
     <div className="p-4 w-full h-full">
       <h1 className="text-2xl font-bold mb-4">Server Allocation Dashboard</h1>
@@ -1456,10 +1481,18 @@ const ServerAllocationDashboard: React.FC = () => {
                       <td className="border border-gray-300 px-2 py-1">{`${s.name}`}</td>
                       <td className="border border-gray-300 px-2 py-1">{`${s.ipAddress}`}</td>
                       <td className="border border-gray-300 px-2 py-1">
-                    <a className='border border-gray-300  rounded' onClick={()=>{
+                    <a className='border border-gray-300  rounded file' onClick={()=>{
                         let content = generateEnv(s);
-                        downloadFile((s.name||s.ipAddress),content);
+                        downloadFile((s.name||s.ipAddress)+'.env',content);
                     }}>.env file</a>
+                     <a className='border border-gray-300  rounded file' onClick={()=>{
+                        let content = generateIvivaConfig(s);
+                        downloadFile((s.name||s.ipAddress)+'-iviva.config.yaml',content);
+                    }}>iviva.config.yaml</a>
+                       <a className='border border-gray-300  rounded file' onClick={()=>{
+                        let content = generateStartScript(s);
+                        downloadFile((s.name||s.ipAddress)+'-start.sh',content);
+                    }}>start.sh</a>
                       </td>
                      
                     </tr>
