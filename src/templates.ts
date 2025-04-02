@@ -4,13 +4,13 @@ IVIVA_ACCOUNT='#{settings.account}'
 DB_HOST='#{sqlserver.ip}'
 DB_PORT='1433'
 DB_USERNAME='sa'
-DB_PASSWORD='#{settings.sqlpassword}'
+DB_PASSWORD='#{settings.sqlServerPassword}'
 REDIS_HOST=#{redis.ip}
 REDIS_PORT=6379`,
     influxdb:`
-DOCKER_INFLUXDB_INIT_USERNAME='iviva'
-DOCKER_INFLUXDB_INIT_PASSWORD='#{settings.influxdbpassword}'
-DOCKER_INFLUXDB_INIT_ADMIN_TOKEN='#{settings.influxdbtoken}'
+DOCKER_INFLUXDB_INIT_USERNAME='#{settings.influxDBUser}'
+DOCKER_INFLUXDB_INIT_PASSWORD='#{settings.influxDBPassword}'
+DOCKER_INFLUXDB_INIT_ADMIN_TOKEN='#{settings.influxDBToken}'
 DOCKER_INFLUXDB_INIT_BUCKET='UMS_#{settings.account}'
     `,
     ivivaweb:`
@@ -18,17 +18,17 @@ IVIVA_BRE_URL='http://#{reportengine.ip}:21002'
     `,
     ums:`
 UMSSERVICE_UMS_INFLUX_URL='http://#{influxdb.ip}:8086'
-UMSSERVICE_UMS_INFLUX_TOKEN='#{settings.influxdbtoken}'
+UMSSERVICE_UMS_INFLUX_TOKEN='#{settings.influxDBToken}'
 UMSSERVICE_UMS_MONGO_URL='mongodb://#{mongodb.ip}:27017'
 UMSSERVICE_UMS_SKIP_BUCKET_CREATE='1'
 UMSAPP_LUCY_HTTP_URL='http://#{lucy.ip}:9111'
 UMSAPP_MONGO_URL='mongodb://#{mongodb.ip}:27017'
 UMSAPP_UMS_SERVICE_URL='http://#{ums.ip}:5122'
-UMSAPP_ACCOUNT_DB_CS='user id=sa;pwd=#{settings.sqlpassword};data source=#{sqlserver.ip};initial catalog=asp'
+UMSAPP_ACCOUNT_DB_CS='user id=#{settings.sqlServerUser};pwd=#{settings.sqlServerPassword};data source=#{sqlserver.ip};initial catalog=asp'
     `,
     queryengine:`
 QUERYENGINE_VERSION='v1'
-QUERYENGINE_DB='user id=sa;pwd=#{settings.sqlpassword};data source=#{sqlserver.ip};initial catalog=asp'
+QUERYENGINE_DB='user id=#{settings.sqlServerUser};pwd=#{settings.sqlServerPassword};data source=#{sqlserver.ip};initial catalog=asp'
 QUERYENGINE_MONGO_URI='mongodb://#{mongodb.ip}:27017'
     `,
     reportengine:`
@@ -41,12 +41,12 @@ export const YAML = `
     settings:
       # DB
       #
-      DB: user id=sa;pwd=#{settings.sqlpassword};data source=#{sqlserver.ip};initial catalog=asp
-      JobQueueDB: user id=sa;pwd=#{settings.sqlpassword};data source=#{sqlserver.ip};initial catalog=JobQueueDB
-      MessagingDB: user id=sa;pwd=#{settings.sqlpassword};data source=#{sqlserver.ip};initial catalog=MessagingDB
-      LucyEventDB: user id=sa;pwd=#{settings.sqlpassword};data source=#{sqlserver.ip};initial catalog=LucyEventDB
-      GroupDB: user id=sa;pwd=#{settings.sqlpassword};data source=#{sqlserver.ip};initial catalog=ProcessDB
-      GroupADB: user id=sa;pwd=#{settings.sqlpassword};data source=#{sqlserver.ip};initial catalog=ProcessDB
+      DB: user id=#{settings.sqlServerUser};pwd=#{settings.sqlServerPassword};data source=#{sqlserver.ip};initial catalog=asp
+      JobQueueDB: user id=#{settings.sqlServerUser};pwd=#{settings.sqlServerPassword};data source=#{sqlserver.ip};initial catalog=JobQueueDB
+      MessagingDB: user id=#{settings.sqlServerUser};pwd=#{settings.sqlServerPassword};data source=#{sqlserver.ip};initial catalog=MessagingDB
+      LucyEventDB: user id=#{settings.sqlServerUser};pwd=#{settings.sqlServerPassword};data source=#{sqlserver.ip};initial catalog=LucyEventDB
+      GroupDB: user id=#{settings.sqlServerUser};pwd=#{settings.sqlServerPassword};data source=#{sqlserver.ip};initial catalog=ProcessDB
+      GroupADB: user id=#{settings.sqlServerUser};pwd=#{settings.sqlServerPassword};data source=#{sqlserver.ip};initial catalog=ProcessDB
       # redis
       #
       RedisServer: #{redis.ip}:6379
@@ -92,12 +92,12 @@ export const YAML = `
       LucyEngine.DebugDataStore: mongodb://#{mongodb.ip}:27017
       # Email Gateway
       #
-      EmailGateway.EmailAddress: #{settings.email}
-      EmailGateway.Host: #{settings.emailsmtp}
+      EmailGateway.EmailAddress: #{settings.emailAddress}
+      EmailGateway.Host: #{settings.smtpServer}
       EmailGateway.Port: 587
       EmailGateway.UseSSL: 1
-      EmailGateway.User: #{settings.emailuser}
-      EmailGateway.Password: #{settings.emailpassword}
+      EmailGateway.User: #{settings.emailUser}
+      EmailGateway.Password: #{settings.emailPassword}
       Clustered: 1
       # process
       #

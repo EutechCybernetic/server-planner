@@ -284,8 +284,10 @@ const ServerAllocationDashboard: React.FC = () => {
       servers,
       connections,
       lbs,
+      settings,
     };
-    downloadFile('Deployment.json',JSON.stringify(configuration,null,2));
+    const fn = (settings?.customerName || 'Servers') + '.Deployment.json'
+    downloadFile(fn,JSON.stringify(configuration,null,2));
   
   };
 
@@ -296,6 +298,9 @@ const ServerAllocationDashboard: React.FC = () => {
         setServers(parsedConfig.servers);
         setLBs(parsedConfig.lbs);
         setConnections(parsedConfig.connections);
+        if (parsedConfig.settings) {
+          setSettings(parsedConfig.settings);
+        }
       } else {
         alert('Invalid configuration format.');
       }
@@ -808,13 +813,13 @@ const ServerAllocationDashboard: React.FC = () => {
         e = ENV['iviva'];
         e += '\n\n' + (ENV[s]||'');
     }
-    return templatize(e.trim(),{...serviceMap});
+    return templatize(e.trim(),{...serviceMap,settings:settings});
   }
   function generateIvivaConfig(s:ServerData|LoadBalancer) {
-    return templatize(YAML.trim(),{...serviceMap});
+    return templatize(YAML.trim(),{...serviceMap,settings:settings});
   }
   function generateDockerCompose(s:ServerData|LoadBalancer) {
-    return templatize(YAML.trim(),{...serviceMap});
+    return templatize(YAML.trim(),{...serviceMap,settings:settings});
   }
   function generateStartScript(s:ServerData|LoadBalancer) {
     let profiles = '';
@@ -834,11 +839,243 @@ const ServerAllocationDashboard: React.FC = () => {
     }
     return templatize(START_SCRIPT.trim(),{...serviceMap,server:s,docker:{profiles}});
   }
+
+  // State for settings panel visibility
+  const [showSettingsPanel, setShowSettingsPanel] = useState<boolean>(false);
+
+  // State for settings values
+  const [settings, setSettings] = useState({
+    customerName: '',
+    account:'',
+    sqlServerUser: 'sa',
+    sqlServerPassword: '',
+    influxDBUser: 'iviva',
+    influxDBPassword: '',
+    influxDBToken: '',
+    mongoDBUser: '',
+    mongoDBPassword: '',
+    emailAddress: '',
+    smtpServer: '',
+    emailUser: '',
+    emailPassword: '',
+  });
+
+  // State for active tab
+  const [activeTab, setActiveTab] = useState<string>('Basic');
+
+  // Handler for updating settings values
+  const handleSettingsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setSettings((prevSettings) => ({
+      ...prevSettings,
+      [name]: value,
+    }));
+  };
+
   return (
     <div className="p-4 w-full h-full">
       <h1 className="text-2xl font-bold mb-4">Deployment Planner</h1>
 
-     
+      {/* Button to open settings panel */}
+      <button
+        className="flex items-center px-4 py-2 bg-gray-500 text-white rounded mb-4"
+        onClick={() => setShowSettingsPanel(true)}
+      >
+        Open Settings
+      </button>
+
+      {/* Settings Panel */}
+      {showSettingsPanel && (
+        <div className="absolute top-0 left-0 right-0 bottom-0 bg-gray-800 bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded shadow-lg w-auto">
+            <h2 className="text-lg font-semibold mb-4">Settings</h2>
+
+            {/* Tabs */}
+            <div className="flex border-b mb-4">
+              {['Basic', 'SQL Server', 'InfluxDB', 'MongoDB', 'Email'].map((tab) => (
+                <button
+                  key={tab}
+                  className={`px-4 py-2 ${
+                    activeTab === tab ? 'border-b-2 border-blue-500 text-blue-500' : 'text-gray-500'
+                  }`}
+                  onClick={() => setActiveTab(tab)}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            <div className="space-y-4">
+              {activeTab === 'Basic' && (<>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Customer Name</label>
+                  <input
+                    type="text"
+                    name="customerName"
+                    value={settings.customerName}
+                    onChange={handleSettingsChange}
+                    className="w-full p-2 border rounded"
+                  />
+                </div>
+                 <div>
+                 <label className="block text-sm font-medium mb-1">iviva Account</label>
+                 <input
+                   type="text"
+                   name="account"
+                   value={settings.account}
+                   onChange={handleSettingsChange}
+                   className="w-full p-2 border rounded"
+                 />
+               </div>
+               </>
+              )}
+              {activeTab === 'SQL Server' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">SQL Server User</label>
+                    <input
+                      type="text"
+                      name="sqlServerUser"
+                      value={settings.sqlServerUser}
+                      onChange={handleSettingsChange}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">SQL Server Password</label>
+                    <input
+                      type="password"
+                      name="sqlServerPassword"
+                      value={settings.sqlServerPassword}
+                      onChange={handleSettingsChange}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                </>
+              )}
+              {activeTab === 'InfluxDB' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">InfluxDB User</label>
+                    <input
+                      type="text"
+                      name="influxDBUser"
+                      value={settings.influxDBUser}
+                      onChange={handleSettingsChange}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">InfluxDB Password</label>
+                    <input
+                      type="password"
+                      name="influxDBPassword"
+                      value={settings.influxDBPassword}
+                      onChange={handleSettingsChange}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">InfluxDB Token</label>
+                    <input
+                      type="text"
+                      name="influxDBToken"
+                      value={settings.influxDBToken}
+                      onChange={handleSettingsChange}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                </>
+              )}
+              {activeTab === 'MongoDB' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">MongoDB User</label>
+                    <input
+                      type="text"
+                      name="mongoDBUser"
+                      value={settings.mongoDBUser}
+                      onChange={handleSettingsChange}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">MongoDB Password</label>
+                    <input
+                      type="password"
+                      name="mongoDBPassword"
+                      value={settings.mongoDBPassword}
+                      onChange={handleSettingsChange}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                </>
+              )}
+              {activeTab === 'Email' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      name="emailAddress"
+                      value={settings.emailAddress}
+                      onChange={handleSettingsChange}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">SMTP Server</label>
+                    <input
+                      type="text"
+                      name="smtpServer"
+                      value={settings.smtpServer}
+                      onChange={handleSettingsChange}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Email User</label>
+                    <input
+                      type="text"
+                      name="emailUser"
+                      value={settings.emailUser}
+                      onChange={handleSettingsChange}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Email Password</label>
+                    <input
+                      type="password"
+                      name="emailPassword"
+                      value={settings.emailPassword}
+                      onChange={handleSettingsChange}
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                className="px-4 py-2 bg-blue-500 text-white rounded"
+                onClick={() => setShowSettingsPanel(false)}
+              >
+                Save
+              </button>
+              <button
+                className="px-4 py-2 bg-gray-300 rounded"
+                onClick={() => setShowSettingsPanel(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rest of the component */}
 
       <div className="flex gap-4 mb-4">
          {/* Add Server Button */}
