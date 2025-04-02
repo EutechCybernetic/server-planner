@@ -910,6 +910,34 @@ const ServerAllocationDashboard: React.FC = () => {
           }}
         />
       </label>
+         {/* Error Icon and Popup */}
+         {errors.length > 0 && (
+        <div className="relative mb-4">
+          <button
+            className="flex items-center px-4 py-2 bg-red-500 text-white rounded"
+            onClick={() => setShowErrorPopup(!showErrorPopup)}
+          >
+            <AlertCircle size={16} className="mr-2" />
+            {errors.length} Error{errors.length > 1 ? 's' : ''}
+          </button>
+          {showErrorPopup && (
+            <div className="absolute top-full mt-2 left-0 bg-white border rounded shadow-lg p-4 z-50" style={{width:'500px'}}>
+              <h3 className="text-lg font-semibold mb-2">Configuration Errors</h3>
+              <ul className="list-disc pl-5 text-sm text-red-600">
+                {errors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+              <button
+                className="mt-2 px-4 py-2 bg-gray-300 rounded"
+                onClick={() => setShowErrorPopup(false)}
+              >
+                Close
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       </div>
       
      
