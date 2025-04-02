@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Server, Database, Circle, RefreshCw, ChevronRight, Copy, Upload, AlertCircle, Route, Zap, Sailboat, ChartArea, Mail, MessageSquare, AlarmClockCheck, Briefcase, Cuboid, Globe, ChartSpline, Telescope, Download } from 'lucide-react';
-import { ENV, START_SCRIPT, YAML } from './templates';
+import { ENV, SETUP_SCRIPT, START_SCRIPT, YAML } from './templates';
 import { downloadFile, templatize } from './util';
 
 // Type definitions
@@ -839,6 +839,24 @@ const ServerAllocationDashboard: React.FC = () => {
     }
     return templatize(START_SCRIPT.trim(),{...serviceMap,server:s,docker:{profiles}});
   }
+  function generateSetupScript(s:ServerData|LoadBalancer) {
+    let profiles = '';
+    for(let srv of s.services) {
+      let a = availableServices.find((x)=>x.id==srv);
+      if (a) {
+        let pr:string[] = [];
+        if (Array.isArray(a.dockerProfile)) {
+          pr = a.dockerProfile;
+        } else {
+          pr = [a.dockerProfile];
+        }
+
+        profiles += pr.map((x)=>` --profile ${x} `).join(' ');
+
+      }
+    }
+    return templatize(SETUP_SCRIPT.trim(),{...serviceMap,server:s,docker:{profiles}});
+  }
 
   // State for settings panel visibility
   const [showSettingsPanel, setShowSettingsPanel] = useState<boolean>(false);
@@ -847,6 +865,7 @@ const ServerAllocationDashboard: React.FC = () => {
   const [settings, setSettings] = useState({
     customerName: '',
     account:'',
+    licenseKey:'',
     sqlServerUser: 'sa',
     sqlServerPassword: '',
     influxDBUser: 'iviva',
@@ -876,13 +895,6 @@ const ServerAllocationDashboard: React.FC = () => {
     <div className="p-4 w-full h-full">
       <h1 className="text-2xl font-bold mb-4">Deployment Planner</h1>
 
-      {/* Button to open settings panel */}
-      <button
-        className="flex items-center px-4 py-2 bg-gray-500 text-white rounded mb-4"
-        onClick={() => setShowSettingsPanel(true)}
-      >
-        Open Settings
-      </button>
 
       {/* Settings Panel */}
       {showSettingsPanel && (
@@ -924,6 +936,16 @@ const ServerAllocationDashboard: React.FC = () => {
                    type="text"
                    name="account"
                    value={settings.account}
+                   onChange={handleSettingsChange}
+                   className="w-full p-2 border rounded"
+                 />
+               </div>
+               <div>
+                 <label className="block text-sm font-medium mb-1">License Key</label>
+                 <input
+                   type="text"
+                   name="licenseKey"
+                   value={settings.licenseKey}
                    onChange={handleSettingsChange}
                    className="w-full p-2 border rounded"
                  />
@@ -1096,6 +1118,13 @@ const ServerAllocationDashboard: React.FC = () => {
         Add Load Balancer
       </button>
 
+      {/* Button to open settings panel */}
+      <button
+        className="flex items-center px-4 py-2 bg-gray-500 text-white rounded mb-4"
+        onClick={() => setShowSettingsPanel(true)}
+      >
+        Open Settings
+      </button>
       {/* Copy Configuration Button */}
       {/* <button 
         className="flex items-center px-4 py-2 bg-green-500 text-white mb-4"
@@ -1758,18 +1787,22 @@ const ServerAllocationDashboard: React.FC = () => {
                       <td className="border border-gray-300 px-2 py-1">{`${s.name}`}</td>
                       <td className="border border-gray-300 px-2 py-1">{`${s.ipAddress}`}</td>
                       <td className="border border-gray-300 px-2 py-1">
-                    <a className='border border-gray-300  rounded file' onClick={()=>{
+                    <a className='mx-5 underline cursor-pointer  rounded file' onClick={()=>{
                         let content = generateEnv(s);
                         downloadFile((s.name||s.ipAddress)+'.env',content);
                     }}>.env file</a>
-                     <a className='border border-gray-300  rounded file' onClick={()=>{
+                     <a className='mx-5 underline cursor-pointer  rounded file' onClick={()=>{
                         let content = generateIvivaConfig(s);
                         downloadFile((s.name||s.ipAddress)+'-iviva.config.yaml',content);
                     }}>iviva.config.yaml</a>
-                       <a className='border border-gray-300  rounded file' onClick={()=>{
+                       <a className='mx-5 underline cursor-pointer  rounded file' onClick={()=>{
                         let content = generateStartScript(s);
                         downloadFile((s.name||s.ipAddress)+'-start.sh',content);
                     }}>start.sh</a>
+                        <a className='mx-5 underline cursor-pointer  rounded file' onClick={()=>{
+                        let content = generateSetupScript(s);
+                        downloadFile((s.name||s.ipAddress)+'-setup.sh',content);
+                    }}>setup.sh</a>
                       </td>
                      
                     </tr>
