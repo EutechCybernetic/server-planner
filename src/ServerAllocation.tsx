@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Server, Database, Circle, RefreshCw, ChevronRight, Copy, Upload, AlertCircle, Route, Zap, Sailboat, ChartArea, Mail, MessageSquare, AlarmClockCheck, Briefcase, Cuboid, Globe, ChartSpline, Telescope } from 'lucide-react';
+import { X, Plus, Server, Database, Circle, RefreshCw, ChevronRight, Copy, Upload, AlertCircle, Route, Zap, Sailboat, ChartArea, Mail, MessageSquare, AlarmClockCheck, Briefcase, Cuboid, Globe, ChartSpline, Telescope, Download } from 'lucide-react';
 import { ENV, START_SCRIPT, YAML } from './templates';
 import { downloadFile, templatize } from './util';
 
@@ -278,6 +278,15 @@ const ServerAllocationDashboard: React.FC = () => {
     navigator.clipboard.writeText(JSON.stringify(configuration, null, 2))
       .then(() => alert('Configuration copied to clipboard!'))
       .catch(() => alert('Failed to copy configuration.'));
+  };
+  const handleSaveConfiguration = (): void => {
+    const configuration = {
+      servers,
+      connections,
+      lbs,
+    };
+    downloadFile('Deployment.json',JSON.stringify(configuration,null,2));
+  
   };
 
   const handleLoadConfiguration = (json: string): void => {
@@ -833,71 +842,74 @@ const ServerAllocationDashboard: React.FC = () => {
 
       <div className="flex gap-4 mb-4">
          {/* Add Server Button */}
-      {(
-        <button 
-          className="flex items-center px-4 py-2 bg-blue-500 text-white rounded mb-4"
-          onClick={() => setShowNewServerForm(true)}
-        >
-          <Plus size={16} className="mr-2" />
-          Add Server
-        </button>
-      )}
-       {/* Add LB Button */}
-       {(
-        <button 
-          className="flex items-center px-4 py-2 bg-blue-500 text-white rounded mb-4"
-          onClick={() => setShowNewLBForm(true)}
-        >
-          <Plus size={16} className="mr-2" />
-          Add Load Balancer
-        </button>
-      )}
-        <button 
-          className="flex items-center px-4 py-2 bg-green-500 text-white mb-4"
-          onClick={handleCopyConfiguration}
-        >
-          <Copy size={16} className="mr-2" />
-          Copy Configuration
-        </button>
-        <button 
-          className="flex items-center px-4 py-2 bg-yellow-500 text-white mb-4"
-          onClick={() => {
-            const json = prompt('Paste the JSON configuration here:');
-            if (json) handleLoadConfiguration(json);
-          }}
-        >
-          <Upload size={16} className="mr-2" />
-          Load Configuration
-        </button>
-         {/* Error Icon and Popup */}
-      {errors.length > 0 && (
-        <div className="relative mb-4">
-          <button
-            className="flex items-center px-4 py-2 bg-red-500 text-white rounded"
-            onClick={() => setShowErrorPopup(!showErrorPopup)}
-          >
-            <AlertCircle size={16} className="mr-2" />
-            {errors.length} Error{errors.length > 1 ? 's' : ''}
-          </button>
-          {showErrorPopup && (
-            <div className="absolute top-full mt-2 left-0 bg-white border rounded shadow-lg p-4 z-50" style={{width:'500px'}}>
-              <h3 className="text-lg font-semibold mb-2">Configuration Errors</h3>
-              <ul className="list-disc pl-5 text-sm text-red-600">
-                {errors.map((error, index) => (
-                  <li key={index}>{error}</li>
-                ))}
-              </ul>
-              <button
-                className="mt-2 px-4 py-2 bg-gray-300 rounded"
-                onClick={() => setShowErrorPopup(false)}
-              >
-                Close
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      <button 
+        className="flex items-center px-4 py-2 bg-blue-500 text-white rounded mb-4"
+        onClick={() => setShowNewServerForm(true)}
+      >
+        <Plus size={16} className="mr-2" />
+        Add Server
+      </button>
 
+      {/* Add LB Button */}
+      <button 
+        className="flex items-center px-4 py-2 bg-blue-500 text-white rounded mb-4"
+        onClick={() => setShowNewLBForm(true)}
+      >
+        <Plus size={16} className="mr-2" />
+        Add Load Balancer
+      </button>
+
+      {/* Copy Configuration Button */}
+      {/* <button 
+        className="flex items-center px-4 py-2 bg-green-500 text-white mb-4"
+        onClick={handleCopyConfiguration}
+      >
+        <Copy size={16} className="mr-2" />
+        Copy Configuration
+      </button> */}
+
+      {/* Load Configuration from Paste */}
+      {/* <button 
+        className="flex items-center px-4 py-2 bg-yellow-500 text-white mb-4"
+        onClick={() => {
+          const json = prompt('Paste the JSON configuration here:');
+          if (json) handleLoadConfiguration(json);
+        }}
+      >
+        <Upload size={16} className="mr-2" />
+        Load Configuration
+      </button> */}
+      {/* save configuration */}
+  <button 
+        className="flex items-center px-4 py-2 bg-green-500 text-white mb-4"
+        onClick={handleSaveConfiguration}
+      >
+        <Download size={16} className="mr-2" />
+        Save Configuration
+      </button>
+      {/* Load Configuration from File */}
+      <label className="flex items-center px-4 py-2 bg-yellow-500 text-white mb-4 cursor-pointer rounded">
+        <Upload size={16} className="mr-2" />
+        Load from File
+        <input
+          type="file"
+          accept="application/json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                const content = event.target?.result;
+                if (typeof content === 'string') {
+                  handleLoadConfiguration(content);
+                }
+              };
+              reader.readAsText(file);
+            }
+          }}
+        />
+      </label>
       </div>
       
      
