@@ -827,7 +827,7 @@ const ServerAllocationDashboard: React.FC = () => {
   }
   return (
     <div className="p-4 w-full h-full">
-      <h1 className="text-2xl font-bold mb-4">Server Allocation Dashboard</h1>
+      <h1 className="text-2xl font-bold mb-4">Deployment Planner</h1>
 
      
 
