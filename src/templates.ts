@@ -124,6 +124,7 @@ sudo docker compose up -d #{docker.profiles}
 export const SETUP_SCRIPT = `
 #!/bin/sh
 LICENSE_KEY="#{settings.licenseKey}"
+curl -s https://docker
 curl -s -o docker-compose.yml -H "X-IVIVA-LICENSE-KEY: $LICENSE_KEY" "http://releases.ivivacloud.com/docker/releases/4.1.0/docker-compose.yml"
-curl "https://license.iviva.com/login?key=#{settings.licenseKey}" -s | docker login iviva.azurecr.io -u 001509a7-8269-46bd-b376-3d2dcdabd8da --password-stdin
+curl "https://license.iviva.com/login?key=$LICENSE_KEY" -s | docker login iviva.azurecr.io -u 001509a7-8269-46bd-b376-3d2dcdabd8da --password-stdin
 `;

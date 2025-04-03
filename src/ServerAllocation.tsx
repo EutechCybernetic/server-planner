@@ -837,7 +837,7 @@ const ServerAllocationDashboard: React.FC = () => {
 
       }
     }
-    return templatize(START_SCRIPT.trim(),{...serviceMap,server:s,docker:{profiles}});
+    return templatize(START_SCRIPT.trim(),{...serviceMap,settings:settings,server:s,docker:{profiles}});
   }
   function generateSetupScript(s:ServerData|LoadBalancer) {
     let profiles = '';
@@ -855,7 +855,7 @@ const ServerAllocationDashboard: React.FC = () => {
 
       }
     }
-    return templatize(SETUP_SCRIPT.trim(),{...serviceMap,server:s,docker:{profiles}});
+    return templatize(SETUP_SCRIPT.trim(),{...serviceMap,settings:settings,server:s,docker:{profiles}});
   }
 
   // State for settings panel visibility
