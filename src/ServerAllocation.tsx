@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Server, Database, Circle, RefreshCw, ChevronRight, Copy, Upload, AlertCircle, Route, Zap, Sailboat, ChartArea, Mail, MessageSquare, AlarmClockCheck, Briefcase, Cuboid, Globe, ChartSpline, Telescope, Download } from 'lucide-react';
-import { ENV, SETUP_SCRIPT, START_SCRIPT, YAML } from './templates';
-import { downloadFile, templatize } from './util';
+import { ENV, NGINX, SETUP_SCRIPT, START_SCRIPT, YAML } from './templates';
+import { downloadFile, downloadZipFile, templatize } from './util';
 
 // Type definitions
 interface Position {
@@ -841,7 +841,11 @@ const ServerAllocationDashboard: React.FC = () => {
   }
   function generateSetupScript(s:ServerData|LoadBalancer) {
     let profiles = '';
+    let needsNginx = false;
     for(let srv of s.services) {
+      if (srv == 'ivivaweb') {
+        needsNginx = true;
+      }
       let a = availableServices.find((x)=>x.id==srv);
       if (a) {
         let pr:string[] = [];
@@ -855,9 +859,26 @@ const ServerAllocationDashboard: React.FC = () => {
 
       }
     }
-    return templatize(SETUP_SCRIPT.trim(),{...serviceMap,settings:settings,server:s,docker:{profiles}});
+    let x =  templatize(SETUP_SCRIPT.trim(),{...serviceMap,settings:settings,server:s,docker:{profiles}});
+    if (needsNginx) {
+      x += '\n# Nginx Configuration\n';
+      x +=  templatize(NGINX.trim(),{...serviceMap,settings:settings,server:s,docker:{profiles}});
+    }
+    return x;
+
   }
 
+  function downloadPackage(s:ServerData|LoadBalancer) {
+    let name = s.name||s.ipAddress;
+    let files = [
+      {name:'env',content:generateEnv(s)},
+      {name:'start.sh',content:generateStartScript(s)},
+      {name:'setup.sh',content:generateSetupScript(s)},
+      {name:'iviva.config.yaml',content:generateIvivaConfig(s)}
+    ];
+    downloadZipFile(files,name+'.zip');
+
+  }
   // State for settings panel visibility
   const [showSettingsPanel, setShowSettingsPanel] = useState<boolean>(false);
 
@@ -1803,6 +1824,9 @@ const ServerAllocationDashboard: React.FC = () => {
                         let content = generateSetupScript(s);
                         downloadFile((s.name||s.ipAddress)+'-setup.sh',content);
                     }}>setup.sh</a>
+                        <a className='mx-5 underline cursor-pointer  rounded file' onClick={()=>{
+                          downloadPackage(s);
+                    }}>Download zip</a>
                       </td>
                      
                     </tr>

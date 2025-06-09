@@ -1,3 +1,4 @@
+import  JSZip from 'jszip'
 export function downloadFile(filename:string, content:string) {
   // Create a blob with the content
   const blob = new Blob([content], { type: 'text/plain' });
@@ -57,3 +58,51 @@ export function templatize(template: string, dictionary: Record<string, any>): s
     });
   }
   
+
+  export interface IFile {
+    content: string;
+    name: string;
+  }
+
+export  async function downloadZipFile(files:IFile[], zipFileName = 'files.zip') {
+  // Import JSZip library (make sure to include it in your HTML)
+  // <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  
+  if (typeof JSZip === 'undefined') {
+    throw new Error('JSZip library is required. Include it with: <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>');
+  }
+
+  try {
+    // Create a new JSZip instance
+    const zip = new JSZip();
+    
+    // Add each file to the zip
+    files.forEach(file => {
+      if (!file.name || !file.content) {
+        console.warn('Skipping file with missing name or content:', file);
+        return;
+      }
+      zip.file(file.name, file.content);
+    });
+    
+    // Generate the zip file as a blob
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    
+    // Create download link and trigger download
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = zipFileName;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Clean up
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log(`Successfully downloaded ${zipFileName} containing ${files.length} files`);
+  } catch (error) {
+    console.error('Error creating zip file:', error);
+    throw error;
+  }
+}

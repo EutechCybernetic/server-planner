@@ -136,3 +136,72 @@ sudo -E curl -s -o /usr/local/bin/iviva -H "X-IVIVA-LICENSE-KEY: $LICENSE_KEY" "
 chmod +x /usr/local/bin/iviva
 
 `;
+export const NGINX = `
+install_nginx() {
+  echo "Installing Nginx..."
+
+  sudo apt update
+  
+  sudo apt install -y nginx
+  
+  sudo systemctl enable nginx
+  
+  echo "Nginx installed successfully."
+}
+
+configure_nginx() {
+  echo "Configuring Nginx..."
+
+  sudo rm -f /etc/nginx/sites-enabled/default
+
+  if [[ -e "/etc/nginx/sites-available/ivivaweb" ]]
+  then
+    backup_file="/etc/nginx/sites-available/ivivaweb-$(date +%d%m%y-%H%M%S)"
+    
+    echo "🚨/etc/nginx/sites-available/ivivaweb nginx profile already exists, backing up to $backup_file..."
+
+    sudo cp /etc/nginx/sites-available/ivivaweb "$backup_file"
+  fi
+  
+  sudo tee /etc/nginx/sites-available/ivivaweb > /dev/null << EOF
+    server {
+      listen        80 default_server;
+
+      location /components/boldreport/ {
+        rewrite                   ^/components/boldreport(.*)\$ \$1 break;
+        proxy_pass                http://#{reportengine.ip}:21002;
+        proxy_set_header          Host \$host;
+        proxy_set_header          X-Real-IP \$remote_addr;
+        proxy_set_header          X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header          X-Forwarded-Proto \$scheme;
+      }
+
+      location / {
+        proxy_pass                http://localhost:5000;
+        proxy_http_version        1.1;
+        proxy_set_header          Upgrade \$http_upgrade;
+        proxy_set_header          Connection \$http_connection;
+        proxy_set_header          Host \$host;
+        proxy_cache_bypass        \$http_upgrade;
+        proxy_set_header          X-Real-IP \$remote_addr;
+        proxy_set_header          X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header          X-Forwarded-Proto \$scheme;
+        client_max_body_size      50M;
+        proxy_read_timeout        600s;
+        proxy_buffer_size         128k;
+        proxy_buffers             4 256k;
+        proxy_busy_buffers_size   256k;
+      }
+    }
+EOF
+
+  echo "🚨Removing /etc/nginx/sites-enabled/ivivaweb nginx profile"
+  sudo rm -f /etc/nginx/sites-enabled/ivivaweb
+
+  sudo ln -s /etc/nginx/sites-available/ivivaweb /etc/nginx/sites-enabled/
+  
+  sudo systemctl restart nginx
+  
+  echo "Nginx configured successfully."
+}
+  `;
