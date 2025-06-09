@@ -118,13 +118,21 @@ export const YAML = `
 export const START_SCRIPT = `
 #!/bin/sh
 # #{server.name}
-sudo docker compose up -d #{docker.profiles}
+sudo docker compose #{docker.profiles} up -d 
 `;
 
 export const SETUP_SCRIPT = `
 #!/bin/sh
 LICENSE_KEY="#{settings.licenseKey}"
-curl -s https://docker
-curl -s -o docker-compose.yml -H "X-IVIVA-LICENSE-KEY: $LICENSE_KEY" "http://releases.ivivacloud.com/docker/releases/4.1.0/docker-compose.yml"
-curl "https://license.iviva.com/login?key=$LICENSE_KEY" -s | docker login iviva.azurecr.io -u 001509a7-8269-46bd-b376-3d2dcdabd8da --password-stdin
+IVIVA_VERSION='4.4.0'
+
+sudo apt install nginx
+curl -s "https://s3-ap-southeast-1.amazonaws.com/iviva.releases/docker/install-docker.sh" | bash
+
+curl -s -o docker-compose.yml -H "X-IVIVA-LICENSE-KEY: $LICENSE_KEY" "http://releases.ivivacloud.com/docker/releases/$IVIVA_VERSION/docker-compose.yml"
+curl -s "https://license.iviva.com/login?key=$LICENSE_KEY" | docker login 069927186243.dkr.ecr.ap-southeast-1.amazonaws.com -u AWS --password-stdin
+
+sudo -E curl -s -o /usr/local/bin/iviva -H "X-IVIVA-LICENSE-KEY: $LICENSE_KEY" "http://releases.ivivacloud.com/docker/releases/$IVIVA_VERSION/iviva"
+chmod +x /usr/local/bin/iviva
+
 `;
