@@ -1,12 +1,14 @@
 export const ENV:any = {
     iviva: `
 IVIVA_ACCOUNT='#{settings.account}'
+IVIVA_CONFIG_PATH=/iviva/config/iviva.config.yaml
 DB_HOST='#{sqlserver.ip}'
 DB_PORT='1433'
 DB_USERNAME='sa'
 DB_PASSWORD='#{settings.sqlServerPassword}'
 REDIS_HOST=#{redis.ip}
-REDIS_PORT=6379`,
+REDIS_PORT=6379
+`,
     influxdb:`
 DOCKER_INFLUXDB_INIT_USERNAME='#{settings.influxDBUser}'
 DOCKER_INFLUXDB_INIT_PASSWORD='#{settings.influxDBPassword}'
@@ -204,4 +206,6 @@ EOF
   
   echo "Nginx configured successfully."
 }
+  install_nginx;
+  configure_nginx;
   `;
