@@ -133,8 +133,22 @@ interface Connection {
     { id: 'ums', name: 'UMS', icon: <Zap size={16} /> ,ports:[22314,5122], supportsHTTPLB: true, dockerProfile:['ums','umsapp']},
 
   ];
-function checkForErrors(servers:ServerData[]):Array<string> {
+function checkForErrors(settings:any,servers:ServerData[]):Array<string> {
     let errors:string[] = [];
+
+    if (!settings.ivivaVersion) {
+      errors.push('iviva version not specified under settings');
+    }
+     if (!settings.sqlServerUser) {
+      errors.push('SQL Server user not specified under settings');
+    }
+    if (!settings.sqlServerPassword) {
+      errors.push('SQL Server password not specified under settings');
+    }
+    if (!settings.licenseKey) {
+      errors.push('License key not specified under settings');
+    }
+    
     let sqlServers = servers.filter(s=>s.services.includes('sqlserver'));
     if (sqlServers.length>1) {
         errors.push('Only one SQL Server is supported. You have ' + sqlServers.length + ' services.');
@@ -435,10 +449,6 @@ const ServerAllocationDashboard: React.FC = () => {
   }, [servers, lbs, serviceDependencies]);
 
   // Validate servers and update errors whenever the server list changes
-  useEffect(() => {
-    const validationErrors = checkForErrors(servers);
-    setErrors(validationErrors);
-  }, [servers]);
 
   function getConnectionTarget(c:Connection,type:'from'|'to'):ServerData|LoadBalancer {
     if (type == 'from') {
@@ -833,7 +843,7 @@ const ServerAllocationDashboard: React.FC = () => {
           pr = [a.dockerProfile];
         }
 
-        profiles += pr.map((x)=>` --profile ${x} `).join(' ');
+        profiles += pr.filter((x)=>x).map((x)=>` --profile ${x} `).join(' ');
 
       }
     }
@@ -842,9 +852,13 @@ const ServerAllocationDashboard: React.FC = () => {
   function generateSetupScript(s:ServerData|LoadBalancer) {
     let profiles = '';
     let needsNginx = false;
+    let hasBoldReports = false;
     for(let srv of s.services) {
       if (srv == 'ivivaweb') {
         needsNginx = true;
+      }
+      if (srv == 'reportengine') {
+        hasBoldReports = true;
       }
       let a = availableServices.find((x)=>x.id==srv);
       if (a) {
@@ -862,7 +876,7 @@ const ServerAllocationDashboard: React.FC = () => {
     let x =  templatize(SETUP_SCRIPT.trim(),{...serviceMap,settings:settings,server:s,docker:{profiles}});
     if (needsNginx) {
       x += '\n# Nginx Configuration\n';
-      x +=  templatize(NGINX.trim(),{...serviceMap,settings:settings,server:s,docker:{profiles}});
+      x +=  templatize(NGINX(hasBoldReports).trim(),{...serviceMap,settings:settings,server:s,docker:{profiles}});
     }
     return x;
 
@@ -887,6 +901,7 @@ const ServerAllocationDashboard: React.FC = () => {
     customerName: '',
     account:'',
     licenseKey:'',
+    ivivaVersion:'4.4.0',
     sqlServerUser: 'sa',
     sqlServerPassword: '',
     influxDBUser: 'iviva',
@@ -899,6 +914,12 @@ const ServerAllocationDashboard: React.FC = () => {
     emailUser: '',
     emailPassword: '',
   });
+
+    useEffect(() => {
+    const validationErrors = checkForErrors(settings,servers);
+    setErrors(validationErrors);
+  }, [servers,settings]);
+
 
   // State for active tab
   const [activeTab, setActiveTab] = useState<string>('Basic');
@@ -967,6 +988,16 @@ const ServerAllocationDashboard: React.FC = () => {
                    type="text"
                    name="licenseKey"
                    value={settings.licenseKey}
+                   onChange={handleSettingsChange}
+                   className="w-full p-2 border rounded"
+                 />
+               </div>
+                <div>
+                 <label className="block text-sm font-medium mb-1">Version</label>
+                 <input
+                   type="text"
+                   name="ivivaVersion"
+                   value={settings.ivivaVersion}
                    onChange={handleSettingsChange}
                    className="w-full p-2 border rounded"
                  />

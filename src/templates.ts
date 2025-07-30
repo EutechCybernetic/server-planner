@@ -126,7 +126,7 @@ sudo docker compose #{docker.profiles} up -d
 export const SETUP_SCRIPT = `
 #!/bin/sh
 LICENSE_KEY="#{settings.licenseKey}"
-IVIVA_VERSION='4.4.0'
+IVIVA_VERSION='#{settings.ivivaVersion}'
 
 sudo apt install nginx
 curl -s "https://s3-ap-southeast-1.amazonaws.com/iviva.releases/docker/install-docker.sh" | bash
@@ -135,10 +135,10 @@ curl -s -o docker-compose.yml -H "X-IVIVA-LICENSE-KEY: $LICENSE_KEY" "http://rel
 curl -s "https://license.iviva.com/login?key=$LICENSE_KEY" | docker login 069927186243.dkr.ecr.ap-southeast-1.amazonaws.com -u AWS --password-stdin
 
 sudo -E curl -s -o /usr/local/bin/iviva -H "X-IVIVA-LICENSE-KEY: $LICENSE_KEY" "http://releases.ivivacloud.com/docker/releases/$IVIVA_VERSION/iviva"
-chmod +x /usr/local/bin/iviva
+sudo chmod +x /usr/local/bin/iviva
 
 `;
-export const NGINX = `
+export const NGINX = (hasBoldReports:boolean) => `
 install_nginx() {
   echo "Installing Nginx..."
 
@@ -168,7 +168,7 @@ configure_nginx() {
   sudo tee /etc/nginx/sites-available/ivivaweb > /dev/null << EOF
     server {
       listen        80 default_server;
-
+` + (!hasBoldReports ? '' : `
       location /components/boldreport/ {
         rewrite                   ^/components/boldreport(.*)\$ \$1 break;
         proxy_pass                http://#{reportengine.ip}:21002;
@@ -177,7 +177,7 @@ configure_nginx() {
         proxy_set_header          X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header          X-Forwarded-Proto \$scheme;
       }
-
+`) + `
       location / {
         proxy_pass                http://localhost:5000;
         proxy_http_version        1.1;
